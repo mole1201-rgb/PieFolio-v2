@@ -1513,7 +1513,15 @@ window.editAsset = function(index) {
     elements.addAssetModal.classList.add('active');
 }
 
-// （移除舊版 Market Drawer 開關事件，按鈕改做橫滑預覽操作）
+window.handleDeleteInModal = function() {
+    if (editingIndex === -1) return;
+    if (confirm('Are you sure you want to delete this asset?')) {
+        portfolio.splice(editingIndex, 1);
+        savePortfolio();
+        updateDashboard();
+        closeModal();
+    }
+}
 
 // ==========================================
 // 初始化執行 (確保順序正確)
@@ -2093,6 +2101,23 @@ setTimeout(() => {
         if (tagDropdown) tagDropdown.style.display = 'none';
     });
 }, 500);
+
+// ==========================================
+// 初始化執行 (確保順序正確)
+// ==========================================
+populateStrategySelects();
+renderStrategySettings();
+renderTagSettings();
+updateTagSuggestions();
+
+// 立即渲染主儀表板，讓使用者看到資料
+updateDashboard();
+
+// 延遲背景同步即時價格
+setTimeout(() => {
+    syncLiveMarketData();
+}, 1000);
+
 
 
 

@@ -137,7 +137,10 @@
                     <input type="number" id="assetCost" required placeholder="Cost" style="flex: 1; padding: 14px; border-radius: 16px; border: 1px solid #e2e8f0;">
                 </div>
                 <input type="number" id="assetPrice" required placeholder="Current Price" style="padding: 14px; border-radius: 16px; border: 1px solid #e2e8f0;">
-                <button type="submit" class="action-btn primary" style="width: 100%; padding: 18px;">Save Asset</button>
+                <div style="display: flex; gap: 12px;">
+                    <button type="submit" class="action-btn primary" style="flex: 3; padding: 18px;">Save Asset</button>
+                    <button type="button" onclick="handleDeleteInModal()" class="action-btn" style="flex: 1; border-color: #fee2e2; color: var(--color-up);">🗑️</button>
+                </div>
             </form>
         </div>
     </div>
