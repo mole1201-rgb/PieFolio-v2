@@ -60,8 +60,7 @@ function saveMarketIndices() {
 }
 
 const elements = {
-    groupSelect: document.getElementById('groupSelect'),
-    assetCardsContainer: document.getElementById('assetCardsContainer'),
+    assetTableBody: document.getElementById('assetTableBody'),
     totalValue: document.getElementById('totalValue'),
     totalProfit: document.getElementById('totalProfit'),
     totalValueChange: document.getElementById('totalValueChange'),
@@ -415,7 +414,7 @@ function formatCurrency(num) {
 }
 
 function updateDashboard() {
-    if (elements.assetCardsContainer) elements.assetCardsContainer.innerHTML = '';
+    elements.assetTableBody.innerHTML = '';
 
     let totalInvestment = 0;
     let totalMarketValue = 0;
@@ -436,40 +435,45 @@ function updateDashboard() {
         totalInvestment += investmentCost;
         totalMarketValue += marketValue;
 
-        // Render Card
-        const cardClass = index % 2 === 0 ? 'mint' : 'purple';
-        const card = document.createElement('div');
-        card.className = `asset-card ${cardClass}`;
-        card.innerHTML = `
-            <div class="asset-info" onclick="editAsset(${index})">
-                <div class="asset-logo">${asset.name.charAt(0)}</div>
-                <div class="asset-details">
-                    <span class="name">${asset.name}</span>
-                    <span class="code">${asset.code} • ${asset.tag || 'Common'}</span>
-                </div>
-            </div>
-            <div class="asset-price" onclick="editAsset(${index})">
-                <span class="price">${formatCurrency(marketValue)}</span>
-                <span class="pnl ${isProfit ? 'profit-up' : 'profit-down'}">
-                    ${isProfit ? '+' : ''}${((profitLoss / investmentCost) * 100).toFixed(2)}%
-                </span>
-            </div>
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <span class="stock-name">${asset.name}</span>
+                <span class="stock-code">${asset.code} <span style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: var(--text-secondary); margin-left: 4px;">${asset.tag || '無標籤'}</span></span>
+            </td>
+            <td>${asset.shares.toLocaleString()} 股</td>
+            <td>$${asset.avgCost.toFixed(2)}</td>
+            <td>$${asset.currentPrice.toFixed(2)}</td>
+            <td>${formatCurrency(marketValue)}</td>
+            <td class="${isProfit ? 'profit-up' : 'profit-down'}">
+                ${isProfit ? '+' : ''}${formatCurrency(profitLoss)}<br/>
+                <span style="font-size: 0.8rem;">(${isProfit ? '+' : ''}${((profitLoss / investmentCost) * 100).toFixed(2)}%)</span>
+            </td>
+            <td>
+                <button class="btn-edit" onclick="editAsset(${index})">編輯</button>
+                <button class="btn-delete" onclick="deleteAsset(${index})">刪除</button>
+            </td>
         `;
-        if (elements.assetCardsContainer) elements.assetCardsContainer.appendChild(card);
+        elements.assetTableBody.appendChild(tr);
     });
 
     const totalProfitLoss = totalMarketValue - totalInvestment;
     const isTotalProfit = totalProfitLoss >= 0;
     const totalRatio = totalInvestment > 0 ? (totalProfitLoss / totalInvestment) * 100 : 0;
 
-    // Update KPI
+    // 更新 KPI Cards
     if (elements.totalValue) {
-        elements.totalValue.innerText = formatCurrency(totalMarketValue);
+        elements.totalValue.innerHTML = `<span class="currency">TWD</span> ${formatCurrency(totalMarketValue).replace('$', '')}`;
     }
+
+    if (elements.totalProfit) {
+        elements.totalProfit.className = `kpi-value ${isTotalProfit ? 'profit-up' : 'profit-down'}`;
+        elements.totalProfit.innerHTML = `${isTotalProfit ? '+' : ''}${formatCurrency(totalProfitLoss)}`;
+    }
+
     if (elements.profitRatio) {
-        elements.profitRatio.style.backgroundColor = isTotalProfit ? 'var(--accent-mint)' : '#fee2e2';
-        elements.profitRatio.style.color = isTotalProfit ? 'var(--color-down)' : 'var(--color-up)';
-        elements.profitRatio.innerText = `${isTotalProfit ? '+' : ''}${totalRatio.toFixed(2)}% (${isTotalProfit ? '+' : ''}${formatCurrency(totalProfitLoss)})`;
+        elements.profitRatio.className = `kpi-change ${isTotalProfit ? 'up' : 'down'}`;
+        elements.profitRatio.innerText = `${isTotalProfit ? '+' : ''}${totalRatio.toFixed(2)}% 總報酬率`;
     }
 
     updateCharts(filteredPortfolio);
@@ -1466,62 +1470,46 @@ function renderDividendHistory() {
 }
 
 // ==========================================
-// 導覽與 Modal 控制
+// 側邊選單導覽邏輯 (Sidebar Navigation / Tab Switching)
 // ==========================================
-window.switchTab = function(targetId, navEl) {
-    document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
-    document.getElementById(targetId).classList.add('active');
-    
-    if (navEl) {
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        navEl.classList.add('active');
-    }
+document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+        // 先移除所有選取狀態
+        document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+        // 為被點擊的項目加上選取狀態
+        e.target.classList.add('active');
 
-    if (targetId === 'page-dashboard') {
-        setTimeout(() => {
-            if (pieChartInstance) pieChartInstance.resize();
-            if (pieTagChartInstance) pieTagChartInstance.resize();
-            if (heatmapInstance) heatmapInstance.resize();
-        }, 100);
-    }
-}
+        // 根據點擊的文字，對應到目標分頁
+        const text = e.target.innerText.trim();
+        let targetId = '';
+        if (text === '資產概況') targetId = 'page-dashboard';
+        else if (text === '股息試算器') targetId = 'page-dividend';
+        else if (text === '設定') targetId = 'page-settings';
 
-window.openAddAssetModal = function() {
-    editingIndex = -1;
-    elements.modalTitle.innerText = "Add Asset";
-    elements.addAssetForm.reset();
-    elements.addAssetModal.classList.add('active');
-}
+        if (targetId) {
+            // 切換分頁顯示狀態 (移除全部的 active)
+            document.querySelectorAll('.page-section').forEach(page => page.classList.remove('active'));
+            const targetPage = document.getElementById(targetId);
+            if (targetPage) {
+                targetPage.classList.add('active');
 
-window.closeModal = function() {
-    elements.addAssetModal.classList.remove('active');
-}
+                const headerTitle = document.querySelector('header h1');
+                const headerSubtitle = document.querySelector('header .subtitle');
 
-// 覆蓋原本的編輯函數以適應新介面
-const originalEditAsset = window.editAsset;
-window.editAsset = function(index) {
-    editingIndex = index;
-    const asset = portfolio[index];
-    elements.modalTitle.innerText = "Edit Asset";
-    elements.assetName.value = asset.name;
-    elements.assetCode.value = asset.code;
-    elements.assetMacro.value = asset.macro || "growth";
-    elements.assetTag.value = asset.tag || "";
-    elements.assetShares.value = asset.shares;
-    elements.assetCost.value = asset.avgCost;
-    elements.assetPrice.value = asset.currentPrice;
-    elements.addAssetModal.classList.add('active');
-}
-
-window.handleDeleteInModal = function() {
-    if (editingIndex === -1) return;
-    if (confirm('Are you sure you want to delete this asset?')) {
-        portfolio.splice(editingIndex, 1);
-        savePortfolio();
-        updateDashboard();
-        closeModal();
-    }
-}
+                if (targetId === 'page-dashboard') {
+                    if (pieChartInstance) pieChartInstance.resize();
+                    if (pieTagChartInstance) pieTagChartInstance.resize();
+                    if (heatmapInstance) heatmapInstance.resize();
+                    if (headerTitle) headerTitle.innerText = "資產概況";
+                } else if (targetId === 'page-dividend') {
+                    if (headerTitle) headerTitle.innerText = "股息試算器";
+                } else if (targetId === 'page-settings') {
+                    if (headerTitle) headerTitle.innerText = "系統設定";
+                }
+            }
+        }
+    });
+});
 
 // ==========================================
 // 初始化執行 (確保順序正確)

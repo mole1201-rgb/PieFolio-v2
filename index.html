@@ -1,145 +1,173 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PieFolio - 投資助手</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>存股理財小幫手</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 </head>
+
 <body>
-    <!-- App Header -->
-    <header class="app-header">
-        <div class="user-greet">
-            <h2>Hey, Investor! 👋</h2>
-            <p>Good morning!</p>
-        </div>
-        <div class="profile-icon">
-            <img src="https://i.pravatar.cc/100?u=investor" alt="Profile">
-        </div>
-    </header>
-
-    <main class="container">
-        <!-- 1. 資產概況分頁 -->
-        <section id="page-dashboard" class="page-section active">
-            <!-- Total Value -->
-            <div class="total-value-card">
-                <span class="label">Current Value</span>
-                <div class="value" id="totalValue">$0</div>
-                <div class="change" id="profitRatio" style="background: var(--accent-mint); color: var(--color-down);">+0.00% (+$0)</div>
+    <div class="app-container">
+        <!-- 側邊選單 -->
+        <aside class="sidebar">
+            <div class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                存股小幫手
+            </div>
+            
+            <div style="margin-top: -24px; margin-bottom: 24px; padding: 6px 10px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2); display: flex; align-items: center; gap: 8px;">
+                <div style="width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px #10b981;"></div>
+                <span style="font-size: 0.75rem; color: #34d399; font-weight: 500;">🔒 本地資料加密儲存</span>
             </div>
 
-            <!-- Quick Actions -->
-            <div class="quick-actions">
-                <button class="action-btn primary" onclick="openAddAssetModal()">
-                    <span class="nav-icon">➕</span> Add Asset
-                </button>
-                <button class="action-btn" onclick="switchTab('page-dividend')">
-                    <span class="nav-icon">📊</span> Analysis
-                </button>
+            <div class="nav-menu">
+                <div class="nav-item active">資產概況</div>
+                <div class="nav-item">股息試算器</div>
+                <div class="nav-item">設定</div>
             </div>
+        </aside>
 
-            <!-- Charts Card (Dark Mode) -->
-            <div class="chart-card">
-                <div class="section-header" style="margin-bottom: 20px;">
-                    <h3 style="color: white;">Portfolio Stats</h3>
-                    <select id="groupSelect" style="background: transparent; color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 4px 8px;">
-                        <option value="all">All Assets</option>
+        <!-- 主內容區塊 -->
+        <main class="main-content">
+            <header>
+                <div>
+                    <h1>資產概況</h1>
+                    <p class="subtitle">即時掌握您的投資績效與資產變化</p>
+                </div>
+                <div class="group-select-wrapper">
+                    <select id="groupSelect">
+                        <option value="all">所有部位</option>
                     </select>
                 </div>
-                <div class="charts-grid">
-                    <div class="chart-container-item" id="portfolioMacroPie"></div>
-                    <div class="chart-container-item" id="portfolioTagPie"></div>
-                    <div class="chart-container-item" id="portfolioHeatmap"></div>
-                </div>
-                <div style="text-align: center; font-size: 0.8rem; color: #9ca3af; margin-top: 10px;">Swipe to see more →</div>
-            </div>
+            </header>
 
-            <!-- Asset List -->
-            <div class="section-header">
-                <h3>My Assets</h3>
-                <a href="#" class="view-all">View All</a>
-            </div>
-            <div id="assetCardsContainer">
-                <!-- Assets will be rendered here as cards -->
-            </div>
-        </section>
-
-        <!-- 2. 股息試算分頁 -->
-        <section id="page-dividend" class="page-section">
-            <div class="total-value-card">
-                <span class="label">Estimated Dividend</span>
-                <div class="value" id="totalDividendOutput">$0</div>
-                <p style="color: var(--text-secondary);">Your annual passive income forecast.</p>
-            </div>
-            <!-- Dividend components go here -->
-            <div id="dividendCalcArea"></div>
-        </section>
-
-        <!-- 3. 設定分頁 -->
-        <section id="page-settings" class="page-section">
-            <div class="user-greet" style="margin-bottom: 24px;">
-                <p>Settings</p>
-            </div>
-            <div class="asset-card purple">
-                <div class="asset-info">
-                    <div class="asset-logo">💾</div>
-                    <div class="asset-details">
-                        <span class="name">Data Backup</span>
-                        <span class="code">Export/Import your data</span>
+            <!-- 1. 資產概況分頁 -->
+            <section id="page-dashboard" class="page-section active">
+                <div class="kpi-grid">
+                    <div class="glass-panel kpi-card">
+                        <div class="kpi-title">總市值 (Total Value)</div>
+                        <div class="kpi-value" id="totalValue">TWD 0</div>
+                        <div class="kpi-change up" id="totalValueChange">+0% 較昨日</div>
+                    </div>
+                    <div class="glass-panel kpi-card">
+                        <div class="kpi-title">未實現損益 (Unrealized P/L)</div>
+                        <div class="kpi-value" id="totalProfit">+$0</div>
+                        <div class="kpi-change up" id="profitRatio">+0% 總報酬率</div>
                     </div>
                 </div>
-            </div>
-            <div class="asset-card mint">
-                <div class="asset-info">
-                    <div class="asset-logo">🔐</div>
-                    <div class="asset-details">
-                        <span class="name">Privacy Mode</span>
-                        <span class="code">Data stays on your device</span>
+
+                <!-- 圖表區 -->
+                <div class="glass-panel" style="padding: 24px; margin-bottom: 24px;">
+                    <div class="charts-carousel">
+                        <div class="carousel-item">
+                            <div style="text-align: center; font-weight: 600; margin-bottom: 12px;">🎯 核心策略分佈</div>
+                            <div id="portfolioMacroPie" style="width: 100%; height: 320px;"></div>
+                        </div>
+                        <div class="carousel-item">
+                            <div style="text-align: center; font-weight: 600; margin-bottom: 12px;">🏷️ 產業屬性分佈</div>
+                            <div id="portfolioTagPie" style="width: 100%; height: 320px;"></div>
+                        </div>
+                        <div class="carousel-item">
+                            <div style="text-align: center; font-weight: 600; margin-bottom: 12px;">🗺️ 資產熱力圖</div>
+                            <div id="portfolioHeatmap" style="width: 100%; height: 320px;"></div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
-    </main>
 
-    <!-- Floating Bottom Navigation -->
-    <nav class="bottom-nav">
-        <div class="nav-item active" onclick="switchTab('page-dashboard', this)">
-            <span class="nav-icon">📈</span>
-        </div>
-        <div class="nav-item center" onclick="openAddAssetModal()">
-            <span class="nav-icon">➕</span>
-        </div>
-        <div class="nav-item" onclick="switchTab('page-settings', this)">
-            <span class="nav-icon">⚙️</span>
-        </div>
-    </nav>
+                <!-- 持股明細 -->
+                <div class="glass-panel" style="padding: 24px; overflow-x: auto;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="margin: 0; font-size: 1.25rem;">持股明細</h2>
+                        <button class="btn-primary" id="addAssetBtn">+ 新增標的</button>
+                    </div>
+                    <table class="assets-table">
+                        <thead>
+                            <tr>
+                                <th>標的名稱</th>
+                                <th>持有股數</th>
+                                <th>成交均價</th>
+                                <th>現價</th>
+                                <th>總市值</th>
+                                <th>未實現損益</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assetTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
 
-    <!-- Modal: Add/Edit Asset -->
+            <!-- 2. 股息試算分頁 -->
+            <section id="page-dividend" class="page-section">
+                <div class="glass-panel" style="padding: 24px;">
+                    <h2>股息試算器</h2>
+                    <p>此區塊內容載入中...</p>
+                </div>
+            </section>
+
+            <!-- 3. 設定分頁 -->
+            <section id="page-settings" class="page-section">
+                <div class="glass-panel" style="padding: 24px;">
+                    <h2>系統設定</h2>
+                    <p>管理您的自定義策略與標籤。</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal: 新增/編輯標的 -->
     <div class="modal-overlay" id="addAssetModal">
-        <div class="modal-content">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                <h2 id="modalTitle" style="margin: 0; font-size: 1.4rem;">Add Asset</h2>
-                <button onclick="closeModal()" style="background: none; border: none; font-size: 1.5rem;">&times;</button>
+        <div class="glass-panel modal-content" style="max-width: 550px; width: 90%; background: #1e2128; padding: 30px; border-radius: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px;">
+                <h2 id="modalTitle" style="margin: 0; font-size: 1.25rem;">新增投資標的</h2>
+                <button class="close-btn" id="closeModalBtn" style="background:none; border:none; color:#94a3b8; font-size: 1.5rem; cursor:pointer;">&times;</button>
             </div>
-            <form id="addAssetForm" style="display: flex; flex-direction: column; gap: 20px;">
-                <div style="display: flex; gap: 12px;">
-                    <input type="text" id="assetName" required placeholder="Name (e.g. Apple)" style="flex: 2; padding: 14px; border-radius: 16px; border: 1px solid #e2e8f0;">
-                    <input type="text" id="assetCode" required placeholder="Code" style="flex: 1; padding: 14px; border-radius: 16px; border: 1px solid #e2e8f0;">
+            <form id="addAssetForm" style="display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="font-size: 0.9rem; color: #94a3b8;">標的名稱</label>
+                        <input type="text" id="assetName" required style="background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:10px; border-radius:6px;">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="font-size: 0.9rem; color: #94a3b8;">股票代碼</label>
+                        <input type="text" id="assetCode" required style="background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:10px; border-radius:6px;">
+                    </div>
                 </div>
-                <div style="display: flex; gap: 12px;">
-                    <select id="assetMacro" style="flex: 1; padding: 14px; border-radius: 16px; border: 1px solid #e2e8f0;"></select>
-                    <input type="text" id="assetTag" placeholder="Tag" style="flex: 1; padding: 14px; border-radius: 16px; border: 1px solid #e2e8f0;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="font-size: 0.9rem; color: #94a3b8;">核心策略</label>
+                        <select id="assetMacro" style="background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:10px; border-radius:6px;"></select>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="font-size: 0.9rem; color: #94a3b8;">產業標籤</label>
+                        <input type="text" id="assetTag" style="background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:10px; border-radius:6px;">
+                    </div>
                 </div>
-                <div style="display: flex; gap: 12px;">
-                    <input type="number" id="assetShares" required placeholder="Shares" style="flex: 1; padding: 14px; border-radius: 16px; border: 1px solid #e2e8f0;">
-                    <input type="number" id="assetCost" required placeholder="Cost" style="flex: 1; padding: 14px; border-radius: 16px; border: 1px solid #e2e8f0;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="font-size: 0.9rem; color: #94a3b8;">持有股數</label>
+                        <input type="number" id="assetShares" required style="background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:10px; border-radius:6px;">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="font-size: 0.9rem; color: #94a3b8;">成交均價</label>
+                        <input type="number" id="assetCost" required step="0.01" style="background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:10px; border-radius:6px;">
+                    </div>
                 </div>
-                <input type="number" id="assetPrice" required placeholder="Current Price" style="padding: 14px; border-radius: 16px; border: 1px solid #e2e8f0;">
-                <div style="display: flex; gap: 12px;">
-                    <button type="submit" class="action-btn primary" style="flex: 3; padding: 18px;">Save Asset</button>
-                    <button type="button" onclick="handleDeleteInModal()" class="action-btn" style="flex: 1; border-color: #fee2e2; color: var(--color-up);">🗑️</button>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label style="font-size: 0.9rem; color: #94a3b8;">目前現價</label>
+                    <input type="number" id="assetPrice" required step="0.01" style="background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:10px; border-radius:6px;">
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
+                    <button type="button" class="btn-secondary" id="cancelModalBtn" style="background:rgba(255,255,255,0.1); border:none; color:#fff; padding:10px 20px; border-radius:6px; cursor:pointer;">取消</button>
+                    <button type="submit" class="btn-primary" style="background:var(--accent-color); border:none; color:#fff; padding:10px 20px; border-radius:6px; cursor:pointer;">儲存標的</button>
                 </div>
             </form>
         </div>
@@ -147,4 +175,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>
