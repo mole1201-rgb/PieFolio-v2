@@ -495,9 +495,9 @@ function renderMarketIndices() {
                 if (/^\d{4,6}$/.test(yfSymbol)) yfSymbol += '.TW';
                 const link = `https://tw.stock.yahoo.com/quote/${encodeURIComponent(yfSymbol)}`;
 
-                return `<a href="${link}" target="_blank" style="display: flex; gap: 6px; align-items: center; white-space: nowrap; text-decoration: none; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-                            <span style="color: var(--text-primary); font-weight: 500;">${idx.name}</span>
-                            <span class="index-change ${changeClass}" style="background: transparent; padding: 0; font-size: 0.9rem;">
+                return `<a href="${link}" target="_blank" style="display: flex; gap: 8px; align-items: center; white-space: nowrap; text-decoration: none; cursor: pointer; transition: opacity 0.2s; color: white !important;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+                            <span style="color: white; font-weight: 500; font-size: 0.95rem; opacity: 0.9;">${idx.name}</span>
+                            <span class="index-change ${changeClass}" style="background: transparent; padding: 0; font-size: 1rem; font-weight: 700;">
                                 ${idx.price.toLocaleString(undefined, { maximumFractionDigits: 0 })} (${sign}${idx.change.toFixed(2)}%)
                             </span>
                         </a>`;
@@ -588,21 +588,23 @@ window.editAsset = function (index) {
 
     // 填入既有資料
     elements.assetName.value = asset.name;
-    elements.assetCode.value = asset.code.replace('.TW', ''); // 移除後綴，如果有的話
-    elements.assetMacro.value = asset.macro || "growth";
+    elements.assetCode.value = asset.code.replace('.TW', ''); 
+    
+    // 策略顯示名稱轉換 (從 ID 轉成中文)
+    const strategy = customStrategies.find(s => s.id === asset.macro) || customStrategies[0];
+    elements.assetMacro.value = strategy.name;
+    
     elements.assetTag.value = asset.tag || "";
     elements.assetShares.value = asset.shares;
     elements.assetCost.value = asset.avgCost;
     elements.assetPrice.value = asset.currentPrice;
-    elements.assetTargetReturn.value = ''; // 清空試算欄位
+    elements.assetTargetReturn.value = ''; 
 
-    // 自動試算並顯示預估報酬率
+    // 自動試算
     setTimeout(() => { elements.assetPrice.dispatchEvent(new Event('input')); }, 50);
 
-    // 更改 Modal 狀態
     elements.modalTitle.innerText = "編輯投資標的";
     elements.submitAssetBtn.innerText = "儲存變更";
-
     elements.addAssetModal.classList.add('active');
 };
 
@@ -839,7 +841,7 @@ elements.addAssetForm.addEventListener('submit', (e) => {
     const newAsset = {
         name: elements.assetName.value,
         code: elements.assetCode.value,
-        macro: elements.assetMacro.value,
+        macro: (customStrategies.find(s => s.name === elements.assetMacro.value) || {id: 'growth'}).id,
         tag: elements.assetTag.value,
         shares: parseInt(elements.assetShares.value, 10),
         avgCost: parseFloat(elements.assetCost.value),
@@ -1017,41 +1019,7 @@ function updateCharts(data) {
     };
     pieTagChartInstance.setOption(tagPieOptions);
 
-    // --- C. 資產熱力圖 (個股明細) ---
-    if (!heatmapInstance) {
-        heatmapInstance = echarts.init(document.getElementById('portfolioHeatmap'));
-        window.addEventListener('resize', () => heatmapInstance.resize());
     }
-
-    const heatmapData = data.map(item => {
-        const marketValue = item.shares * item.currentPrice;
-        const dailyChange = item.dailyChangeRatio !== undefined ? item.dailyChangeRatio : 0;
-
-        let baseColor = '#5e6573';
-        if (dailyChange > 0) baseColor = '#ef4444';
-        else if (dailyChange < 0) baseColor = '#10b981';
-
-        return {
-            name: `${item.name}\n${dailyChange > 0 ? '+' : ''}${dailyChange.toFixed(2)}%`,
-            value: marketValue,
-            itemStyle: { color: baseColor, borderColor: '#1e2128', borderWidth: 2 }
-        };
-    });
-
-    heatmapInstance.setOption({
-        tooltip: {
-            formatter: (info) => `${info.name.split('\n')[0]}<br>市值: ${formatCurrency(info.value)}`
-        },
-        series: [{
-            type: 'treemap',
-            data: heatmapData,
-            width: '100%', height: '100%',
-            roam: false, nodeClick: false, breadcrumb: { show: false },
-            label: { show: true, formatter: '{b}', color: '#fff', fontSize: 14, fontWeight: 500 },
-            itemStyle: { gapWidth: 4, borderColor: '#0d0f14' }
-        }]
-    });
-}
 
 // ==========================================
 // Phase 2 功能實作
@@ -1470,70 +1438,65 @@ function renderDividendHistory() {
 }
 
 // ==========================================
-// 側邊選單導覽邏輯 (Sidebar Navigation / Tab Switching)
+// 側邊選單導覽邏輯 (精準屬性切換版)
 // ==========================================
-document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-        // 先移除所有選取狀態
-        document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-        // 為被點擊的項目加上選取狀態
-        e.target.classList.add('active');
+function setupNavigation() {
+    const navItems = document.querySelectorAll('.nav-item');
+    const sections = document.querySelectorAll('.page-section');
 
-        // 根據點擊的文字，對應到目標分頁
-        const text = e.target.innerText.trim();
-        let targetId = '';
-        if (text === '資產概況') targetId = 'page-dashboard';
-        else if (text === '股息試算器') targetId = 'page-dividend';
-        else if (text === '熱門成分股') targetId = 'page-etf';
-        else if (text === '設定') targetId = 'page-settings';
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            const targetId = item.getAttribute('data-page');
+            if (!targetId) return;
 
-        if (targetId) {
-            // 切換分頁顯示狀態 (移除全部的 active)
-            document.querySelectorAll('.page-section').forEach(page => page.classList.remove('active'));
+            console.log('Switching to page:', targetId);
+
+            // 1. 移除所有 active 狀態
+            navItems.forEach(nav => nav.classList.remove('active'));
+            sections.forEach(page => {
+                page.classList.remove('active');
+                page.style.display = 'none'; // 強制隱藏
+            });
+
+            // 2. 啟動選中狀態
+            item.classList.add('active');
             const targetPage = document.getElementById(targetId);
             if (targetPage) {
                 targetPage.classList.add('active');
+                targetPage.style.display = 'block'; // 強制顯示
 
+                // 3. 標題與附屬組件更新
                 const headerTitle = document.querySelector('header h1');
                 const headerSubtitle = document.querySelector('header .subtitle');
+                const groupSel = document.querySelector('.group-select-wrapper');
 
-                // 如果是切回儀表板，需要強制觸發 ECharts 重新計算尺寸，否則在 display:none 後會破版
                 if (targetId === 'page-dashboard') {
-                    if (pieChartInstance) pieChartInstance.resize();
-                    if (pieTagChartInstance) pieTagChartInstance.resize();
-                    if (heatmapInstance) heatmapInstance.resize();
-
                     if (headerTitle) headerTitle.innerText = "資產概況";
                     if (headerSubtitle) headerSubtitle.innerText = "即時掌握您的投資績效與資產變化";
-
-                    const groupSel = document.querySelector('.group-select-wrapper');
                     if (groupSel) groupSel.style.display = 'block';
-
+                    // 重新觸發圖表尺寸調整
+                    if (pieChartInstance) pieChartInstance.resize();
+                    if (pieTagChartInstance) pieTagChartInstance.resize();
                 } else if (targetId === 'page-dividend') {
                     if (headerTitle) headerTitle.innerText = "股息試算器";
                     if (headerSubtitle) headerSubtitle.innerText = "年度配息估算與歷史除權息紀錄";
-
-                    const groupSel = document.querySelector('.group-select-wrapper');
                     if (groupSel) groupSel.style.display = 'none';
-
-                } else if (targetId === 'page-etf') {
-                    if (headerTitle) headerTitle.innerText = "熱門成份股";
-                    if (headerSubtitle) headerSubtitle.innerText = "掌握市場主流 ETF 內部關鍵個股";
-
-                    const groupSel = document.querySelector('.group-select-wrapper');
-                    if (groupSel) groupSel.style.display = 'none';
-
                 } else if (targetId === 'page-settings') {
                     if (headerTitle) headerTitle.innerText = "系統設定";
-                    if (headerSubtitle) headerSubtitle.innerText = "資料備份、匯出與隱私資料轉移";
-
-                    const groupSel = document.querySelector('.group-select-wrapper');
+                    if (headerSubtitle) headerSubtitle.innerText = "資料備份、匯出與自定義配置";
                     if (groupSel) groupSel.style.display = 'none';
                 }
             }
-        }
+        });
     });
-});
+
+    // 啟動時預設顯示首頁
+    const defaultNav = document.querySelector('.nav-item[data-page="page-dashboard"]');
+    if (defaultNav) defaultNav.click();
+}
+
+// 執行初始化
+setupNavigation();
 
 // （移除舊版 Market Drawer 開關事件，按鈕改做橫滑預覽操作）
 
@@ -1554,7 +1517,10 @@ renderConstituents();
 updateDividendHistoryDropdown();
 renderDividendHistory();
 
-// 如果是初次使用或舊版升級（缺少最新資料格式），自動觸發背景同步避免空號滿天飛
+// 4. 啟動輔助功能
+initTagAutocomplete();
+
+// 如果是初次使用或舊版升級
 if (portfolio.length > 0) {
     const hasData = portfolio.some(a => myDividendData[a.code] && myDividendData[a.code].averages);
     if (!hasData) {
@@ -2044,77 +2010,93 @@ function updateTagSuggestions() {
 // ==========================================
 // 標籤智慧下拉選單邏輯 (Tag Autocomplete)
 // ==========================================
-function renderTagDropdown(filter = "") {
-    const dropdown = document.getElementById('assetTagAutocomplete');
+// ==========================================
+// 標籤智慧下拉選單 (診斷強化版 - 移除過濾限制)
+// ==========================================
+/**
+ * 獨立標籤補全模組 (不依賴外部變數，解決所有衝突)
+ */
+function initTagAutocomplete() {
     const input = document.getElementById('assetTag');
-    if (!dropdown || !input) return;
+    const dropdown = document.getElementById('assetTagAutocomplete');
+    const arrow = document.getElementById('tagDropdownArrow');
+    if (!input || !dropdown) return;
 
-    // 取得所有可用標籤 (預設 + 已使用)
-    const allTags = new Set([...customTags]);
-    portfolio.forEach(asset => {
-        if (asset && asset.tag) allTags.add(asset.tag);
+    // 內部資料獲取：從 localStorage 獲取最新標籤
+    const getLatestTags = () => {
+        const defaults = ["市值型", "高股息", "金融", "半導體/AI", "電子/傳產", "軍工", "債券", "數位支付", "ETF"];
+        let localCustoms = [];
+        try {
+            const saved = localStorage.getItem('myCustomTags');
+            if (saved) localCustoms = JSON.parse(saved);
+        } catch (e) {}
+        
+        // 獲取目前投資組合中已存在的標籤
+        let portfolioTags = [];
+        try {
+            if (typeof portfolio !== 'undefined') {
+                portfolio.forEach(a => { if(a.tag) portfolioTags.push(a.tag); });
+            }
+        } catch (e) {}
+        
+        return Array.from(new Set([...defaults, ...(Array.isArray(localCustoms) ? localCustoms : []), ...portfolioTags]));
+    };
+
+    const showDropdown = (filter = "") => {
+        const allTags = getLatestTags();
+        const filtered = (filter === "FORCE_ALL" || !filter) 
+            ? allTags 
+            : allTags.filter(t => t.toLowerCase().includes(filter.toLowerCase()));
+
+        if (filtered.length === 0 && filter !== "FORCE_ALL") {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        dropdown.innerHTML = filtered.map(tag => `
+            <div class="autocomplete-item" 
+                 style="padding: 14px 18px; cursor: pointer; color: white; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.95rem;"
+                 onmousedown="window._selectAssetTag('${tag}')">
+                ${tag}
+            </div>
+        `).join('');
+
+        // 強制顯示與溢出控制
+        const parent = input.parentElement;
+        if (parent) parent.style.overflow = 'visible';
+        dropdown.style.display = 'block';
+        dropdown.style.opacity = '1';
+        dropdown.style.visibility = 'visible';
+        dropdown.style.zIndex = '30000';
+        dropdown.style.background = '#1e222d';
+    };
+
+    // 事件監聽 (mousedown 優先權最高)
+    input.addEventListener('mousedown', (e) => { e.stopPropagation(); showDropdown("FORCE_ALL"); });
+    input.addEventListener('focus', () => showDropdown("FORCE_ALL"));
+    input.addEventListener('input', () => showDropdown(input.value));
+    if (arrow) arrow.addEventListener('mousedown', (e) => { e.stopPropagation(); showDropdown("FORCE_ALL"); });
+
+    // 全域關閉邏輯
+    document.addEventListener('mousedown', (e) => {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
     });
 
-    const tagList = Array.from(allTags);
-    const filtered = filter 
-        ? tagList.filter(t => t.toLowerCase().includes(filter.toLowerCase()))
-        : tagList;
-
-    if (filtered.length === 0) {
+    // 註冊全域回寫函數
+    window._selectAssetTag = (tag) => {
+        input.value = tag;
+        input.dispatchEvent(new Event('input'));
         dropdown.style.display = 'none';
-        return;
-    }
-
-    dropdown.innerHTML = filtered.map(tag => `
-        <div class="autocomplete-item" style="padding: 10px; cursor: pointer; transition: background 0.2s;" 
-             onclick="selectTag('${tag}')">
-            ${tag}
-        </div>
-    `).join('');
-    dropdown.style.display = 'block';
+    };
 }
 
-window.selectTag = function(tag) {
-    const input = document.getElementById('assetTag');
-    const dropdown = document.getElementById('assetTagAutocomplete');
-    if (input) input.value = tag;
-    if (dropdown) dropdown.style.display = 'none';
-};
-
-// 綁定標籤輸入框事件
-setTimeout(() => {
-    const tagInput = document.getElementById('assetTag');
-    const tagArrow = document.getElementById('tagDropdownArrow');
-    const tagDropdown = document.getElementById('assetTagAutocomplete');
-
-    if (tagInput) {
-        // 任何狀態下點選都跳出全清單 (不論是否有舊文字)
-        tagInput.addEventListener('click', (e) => {
-            renderTagDropdown(""); 
-            e.stopPropagation();
-        });
-        
-        tagInput.addEventListener('focus', () => {
-            renderTagDropdown("");
-        });
-
-        tagInput.addEventListener('input', () => {
-            renderTagDropdown(tagInput.value);
-        });
-    }
-
-    if (tagArrow) {
-        tagArrow.addEventListener('click', (e) => {
-            renderTagDropdown(""); // 點箭頭強迫顯示全清單
-            e.stopPropagation();
-        });
-    }
-
-    // 點擊外面自動關閉
-    document.addEventListener('click', () => {
-        if (tagDropdown) tagDropdown.style.display = 'none';
-    });
-}, 500);
+// 立即執行初始化
+initTagAutocomplete();
+// 雙重保險：在載入完畢後再次執行，防止 SPA 渲染延遲
+window.addEventListener('load', initTagAutocomplete);
+setTimeout(initTagAutocomplete, 500); 
 
 
 

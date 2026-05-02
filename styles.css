@@ -575,16 +575,24 @@ h1 {
 .modal-overlay.active { display: flex; }
 
 .modal-content {
-  width: 95%;
-  max-width: 640px;
-  background: #1e293b;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 32px;
-  padding: 40px;
-  position: relative;
-  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
-  transform: translateY(20px);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: rgba(20, 22, 28, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--panel-border);
+    border-radius: 24px;
+    padding: 32px;
+    width: 90%;
+    max-width: 800px;
+    position: relative;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    overflow: visible !important; /* 確保下拉選單不會被切斷 */
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    margin-bottom: 24px;
+    overflow: visible !important; /* 確保內容不會被裁切 */
 }
 
 .modal-overlay.active .modal-content { transform: translateY(0); }
@@ -624,14 +632,103 @@ input:focus, select:focus {
 }
 
 .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); color: var(--text-primary); }
-ter;
-    scroll-snap-stop: always;
-    box-sizing: border-box;
-    padding: 16px;
-  }
+/* ==========================================
+   佈局修復：垂直分頁流
+   ========================================== */
+
+.main-content {
+  flex: 1;
+  padding: 40px;
+  overflow-y: auto;
+  display: block !important; 
+  position: relative;
+  background: var(--bg-color);
   
-  .carousel-hint { 
-    display: block !important;
-    opacity: 0.8;
-  }
+  /* 隱藏捲軸但保留功能 */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
 }
+
+.main-content::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.page-section {
+  display: none !important; 
+  width: 100%;
+  max-width: 1200px; /* 限制最大寬度讓閱讀更舒服 */
+  margin: 0 auto;
+  flex-direction: column !important; /* 強制垂直 */
+  gap: 32px;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.page-section.active {
+  display: flex !important; /* 使用 flex 但方向為垂直 */
+}
+
+/* 確保所有面板佔滿寬度，不再並排 */
+.glass-panel {
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 側邊欄按鈕激活狀態修復 */
+.nav-item.active {
+  background: rgba(59, 130, 246, 0.15) !important;
+  color: var(--accent-color) !important;
+  font-weight: 700;
+  box-shadow: inset 4px 0 0 var(--accent-color) !important;
+}
+
+/* 捲軸美化 */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-color); }
+
+/* �ɥ����˦��ץ� */
+.autocomplete-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #1e222d !important;
+    border: 2px solid #3b82f6 !important;
+    border-radius: 12px;
+    margin-top: 10px;
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 20001 !important;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    backdrop-filter: blur(20px);
+}
+.autocomplete-item {
+    padding: 14px 18px;
+    cursor: pointer;
+    color: #ffffff !important;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 0.95rem;
+}
+.autocomplete-item:hover {
+    background: #3b82f6 !important;
+    color: #fff !important;
+}
+
+/* �j�O���äU�Կ�汲�b (Chrome/Safari) */
+.autocomplete-dropdown::-webkit-scrollbar {
+    display: none;
+}
+
+/* ���^�ܦ��޿� (������^) */
+.up, .profit-up, .color-up { color: var(--color-up) !important; }
+.down, .profit-down, .color-down { color: var(--color-down) !important; }
+
+/* KPI ���S�v�r��[�� */
+.kpi-change { font-weight: 700; }
