@@ -61,8 +61,7 @@ function saveMarketIndices() {
 
 const elements = {
     groupSelect: document.getElementById('groupSelect'),
-    assetTableBody: document.getElementById('assetTableBody'),
-    assetCardsContainer: document.getElementById('assetCardsContainer'), // 新增：手機版卡片容器
+    assetCardsContainer: document.getElementById('assetCardsContainer'),
     totalValue: document.getElementById('totalValue'),
     totalProfit: document.getElementById('totalProfit'),
     totalValueChange: document.getElementById('totalValueChange'),
@@ -416,7 +415,6 @@ function formatCurrency(num) {
 }
 
 function updateDashboard() {
-    elements.assetTableBody.innerHTML = '';
     if (elements.assetCardsContainer) elements.assetCardsContainer.innerHTML = '';
 
     let totalInvestment = 0;
@@ -425,7 +423,6 @@ function updateDashboard() {
 
     portfolio.forEach((asset, index) => {
         if (!asset) return;
-        // 過濾群組
         const selectedGroup = elements.groupSelect ? elements.groupSelect.value : 'all';
         if (selectedGroup !== 'all' && asset.macro !== selectedGroup) return;
 
@@ -439,87 +436,44 @@ function updateDashboard() {
         totalInvestment += investmentCost;
         totalMarketValue += marketValue;
 
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>
-                <span class="stock-name">${asset.name}</span>
-                <span class="stock-code">${asset.code} <span class="card-tag">${asset.tag || '無標籤'}</span></span>
-            </td>
-            <td>${asset.shares.toLocaleString()} 股</td>
-            <td>$${asset.avgCost.toFixed(2)}</td>
-            <td>$${asset.currentPrice.toFixed(2)}</td>
-            <td>${formatCurrency(marketValue)}</td>
-            <td class="${isProfit ? 'profit-up' : 'profit-down'}">
-                ${isProfit ? '+' : ''}${formatCurrency(profitLoss)}<br/>
-                <span style="font-size: 0.8rem;">(${isProfit ? '+' : ''}${((profitLoss / investmentCost) * 100).toFixed(2)}%)</span>
-            </td>
-            <td>
-                <button class="btn-edit" onclick="editAsset(${index})">編</button>
-                <button class="btn-delete" onclick="deleteAsset(${index})">刪</button>
-            </td>
-        `;
-        elements.assetTableBody.appendChild(tr);
-
-        // --- 同步渲染手機版卡片 ---
+        // Render Card
+        const cardClass = index % 2 === 0 ? 'mint' : 'purple';
         const card = document.createElement('div');
-        card.className = 'asset-card';
+        card.className = `asset-card ${cardClass}`;
         card.innerHTML = `
-            <div class="card-header">
-                <div class="card-title">
-                    <span class="card-name">${asset.name}</span>
-                    <span class="card-code">${asset.code} <span class="card-tag">${asset.tag || '無標籤'}</span></span>
+            <div class="asset-info" onclick="editAsset(${index})">
+                <div class="asset-logo">${asset.name.charAt(0)}</div>
+                <div class="asset-details">
+                    <span class="name">${asset.name}</span>
+                    <span class="code">${asset.code} • ${asset.tag || 'Common'}</span>
                 </div>
-                <div class="${isProfit ? 'profit-up' : 'profit-down'}" style="text-align: right; font-weight: 600;">
+            </div>
+            <div class="asset-price" onclick="editAsset(${index})">
+                <span class="price">${formatCurrency(marketValue)}</span>
+                <span class="pnl ${isProfit ? 'profit-up' : 'profit-down'}">
                     ${isProfit ? '+' : ''}${((profitLoss / investmentCost) * 100).toFixed(2)}%
-                </div>
-            </div>
-            <div class="card-body">
-                <div class="card-item">
-                    <span class="card-label">持有股數</span>
-                    <span class="card-value">${asset.shares.toLocaleString()} 股</span>
-                </div>
-                <div class="card-item">
-                    <span class="card-label">成交均價</span>
-                    <span class="card-value">$${asset.avgCost.toFixed(2)}</span>
-                </div>
-                <div class="card-item">
-                    <span class="card-label">目前市值</span>
-                    <span class="card-value">${formatCurrency(marketValue)}</span>
-                </div>
-                <div class="card-item">
-                    <span class="card-label">累計損益</span>
-                    <span class="card-value ${isProfit ? 'profit-up' : 'profit-down'}">${isProfit ? '+' : ''}${formatCurrency(profitLoss)}</span>
-                </div>
-            </div>
-            <div class="card-actions">
-                <button class="btn-edit" onclick="editAsset(${index})" style="flex:1">編輯</button>
-                <button class="btn-delete" onclick="deleteAsset(${index})" style="flex:1">刪除</button>
+                </span>
             </div>
         `;
-        if (elements.assetCardsContainer) {
-            elements.assetCardsContainer.appendChild(card);
-        }
+        if (elements.assetCardsContainer) elements.assetCardsContainer.appendChild(card);
     });
 
     const totalProfitLoss = totalMarketValue - totalInvestment;
     const isTotalProfit = totalProfitLoss >= 0;
     const totalRatio = totalInvestment > 0 ? (totalProfitLoss / totalInvestment) * 100 : 0;
 
-    // 更新 KPI Cards
-    elements.totalValue.innerHTML = `<span class="currency">TWD</span> ${formatCurrency(totalMarketValue).replace('$', '')}`;
-
-    elements.totalProfit.className = `kpi-value ${isTotalProfit ? 'profit-up' : 'profit-down'}`;
-    elements.totalProfit.innerHTML = `${isTotalProfit ? '+' : ''}${formatCurrency(totalProfitLoss)}`;
-
-    elements.profitRatio.className = `kpi-change ${isTotalProfit ? 'up' : 'down'}`;
-    elements.profitRatio.innerText = `${isTotalProfit ? '+' : ''}${totalRatio.toFixed(2)}% 總報酬率`;
+    // Update KPI
+    if (elements.totalValue) {
+        elements.totalValue.innerText = formatCurrency(totalMarketValue);
+    }
+    if (elements.profitRatio) {
+        elements.profitRatio.style.backgroundColor = isTotalProfit ? 'var(--accent-mint)' : '#fee2e2';
+        elements.profitRatio.style.color = isTotalProfit ? 'var(--color-down)' : 'var(--color-up)';
+        elements.profitRatio.innerText = `${isTotalProfit ? '+' : ''}${totalRatio.toFixed(2)}% (${isTotalProfit ? '+' : ''}${formatCurrency(totalProfitLoss)})`;
+    }
 
     updateCharts(filteredPortfolio);
-    updateETFDropdown(); // 同步更新 ETF 下拉選單
-    updateDividendHistoryDropdown(); // 更新歷年配息下拉選單
-
-    // 渲染市場指數
-    renderMarketIndices();
+    updateETFDropdown();
 }
 
 function renderMarketIndices() {
@@ -1512,50 +1466,52 @@ function renderDividendHistory() {
 }
 
 // ==========================================
-// 選單導覽邏輯 (Responsive Navigation)
+// 導覽與 Modal 控制
 // ==========================================
-document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-        const target = e.currentTarget;
-        const targetId = target.getAttribute('data-page');
+window.switchTab = function(targetId, navEl) {
+    document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+    document.getElementById(targetId).classList.add('active');
+    
+    if (navEl) {
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        navEl.classList.add('active');
+    }
 
-        if (!targetId) return;
+    if (targetId === 'page-dashboard') {
+        setTimeout(() => {
+            if (pieChartInstance) pieChartInstance.resize();
+            if (pieTagChartInstance) pieTagChartInstance.resize();
+            if (heatmapInstance) heatmapInstance.resize();
+        }, 100);
+    }
+}
 
-        // 1. 切換按鈕狀態
-        document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-        target.classList.add('active');
+window.openAddAssetModal = function() {
+    editingIndex = -1;
+    elements.modalTitle.innerText = "Add Asset";
+    elements.addAssetForm.reset();
+    elements.addAssetModal.classList.add('active');
+}
 
-        // 2. 切換分頁
-        document.querySelectorAll('.page-section').forEach(page => page.classList.remove('active'));
-        const targetPage = document.getElementById(targetId);
-        if (targetPage) {
-            targetPage.classList.add('active');
+window.closeModal = function() {
+    elements.addAssetModal.classList.remove('active');
+}
 
-            // 3. 更新標題 (桌機版)
-            const headerTitle = document.querySelector('.desktop-header h1');
-            const headerSubtitle = document.querySelector('.desktop-header .subtitle');
-
-            // 4. 分頁特定邏輯
-            if (targetId === 'page-dashboard') {
-                if (pieChartInstance) pieChartInstance.resize();
-                if (pieTagChartInstance) pieTagChartInstance.resize();
-                if (heatmapInstance) heatmapInstance.resize();
-                if (headerTitle) headerTitle.innerText = "資產概況";
-                document.querySelector('.group-select-wrapper').style.display = 'block';
-            } else {
-                document.querySelector('.group-select-wrapper').style.display = 'none';
-                if (targetId === 'page-dividend') {
-                    if (headerTitle) headerTitle.innerText = "股息試算器";
-                } else if (targetId === 'page-settings') {
-                    if (headerTitle) headerTitle.innerText = "系統設定";
-                }
-            }
-        }
-        
-        // 手機版自動滾回頂部
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-});
+// 覆蓋原本的編輯函數以適應新介面
+const originalEditAsset = window.editAsset;
+window.editAsset = function(index) {
+    editingIndex = index;
+    const asset = portfolio[index];
+    elements.modalTitle.innerText = "Edit Asset";
+    elements.assetName.value = asset.name;
+    elements.assetCode.value = asset.code;
+    elements.assetMacro.value = asset.macro || "growth";
+    elements.assetTag.value = asset.tag || "";
+    elements.assetShares.value = asset.shares;
+    elements.assetCost.value = asset.avgCost;
+    elements.assetPrice.value = asset.currentPrice;
+    elements.addAssetModal.classList.add('active');
+}
 
 // （移除舊版 Market Drawer 開關事件，按鈕改做橫滑預覽操作）
 
