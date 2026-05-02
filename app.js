@@ -98,7 +98,8 @@ const elements = {
     assetCost: document.getElementById('assetCost'),
     assetPrice: document.getElementById('assetPrice'),
     assetTargetReturn: document.getElementById('assetTargetReturn'),
-    submitAssetBtn: document.querySelector('#addAssetForm button[type="submit"]')
+    submitAssetBtn: document.querySelector('#addAssetForm button[type="submit"]'),
+    groupSelect: document.getElementById('groupSelect')
 };
 
 // ==========================================
@@ -547,7 +548,9 @@ if (dividendHistorySelect) {
 }
 
 // 事件監聽
-elements.groupSelect.addEventListener('change', updateDashboard);
+if (elements.groupSelect) {
+    elements.groupSelect.addEventListener('change', updateDashboard);
+}
 
 // 頁面切換邏輯 (輔助自訂功能跳轉)
 window.showSettingsPage = function () {
