@@ -60,6 +60,7 @@ function saveMarketIndices() {
 }
 
 const elements = {
+    groupSelect: document.getElementById('groupSelect'),
     assetTableBody: document.getElementById('assetTableBody'),
     totalValue: document.getElementById('totalValue'),
     totalProfit: document.getElementById('totalProfit'),
@@ -98,8 +99,7 @@ const elements = {
     assetCost: document.getElementById('assetCost'),
     assetPrice: document.getElementById('assetPrice'),
     assetTargetReturn: document.getElementById('assetTargetReturn'),
-    submitAssetBtn: document.querySelector('#addAssetForm button[type="submit"]'),
-    groupSelect: document.getElementById('groupSelect')
+    submitAssetBtn: document.querySelector('#addAssetForm button[type="submit"]')
 };
 
 // ==========================================
@@ -423,6 +423,7 @@ function updateDashboard() {
 
     portfolio.forEach((asset, index) => {
         if (!asset) return;
+        // 過濾群組
         const selectedGroup = elements.groupSelect ? elements.groupSelect.value : 'all';
         if (selectedGroup !== 'all' && asset.macro !== selectedGroup) return;
 
@@ -448,7 +449,7 @@ function updateDashboard() {
             <td>${formatCurrency(marketValue)}</td>
             <td class="${isProfit ? 'profit-up' : 'profit-down'}">
                 ${isProfit ? '+' : ''}${formatCurrency(profitLoss)}<br/>
-                <span style="font-size: 0.8rem;">(${isProfit ? '+' : ''}${((profitLoss / investmentCost) * 100).toFixed(2)}%)</span>
+                <small>(${((profitLoss / investmentCost) * 100).toFixed(2)}%)</small>
             </td>
             <td>
                 <button class="btn-edit" onclick="editAsset(${index})">編輯</button>
@@ -463,22 +464,20 @@ function updateDashboard() {
     const totalRatio = totalInvestment > 0 ? (totalProfitLoss / totalInvestment) * 100 : 0;
 
     // 更新 KPI Cards
-    if (elements.totalValue) {
-        elements.totalValue.innerHTML = `<span class="currency">TWD</span> ${formatCurrency(totalMarketValue).replace('$', '')}`;
-    }
+    elements.totalValue.innerHTML = `<span class="currency">TWD</span> ${formatCurrency(totalMarketValue).replace('$', '')}`;
 
-    if (elements.totalProfit) {
-        elements.totalProfit.className = `kpi-value ${isTotalProfit ? 'profit-up' : 'profit-down'}`;
-        elements.totalProfit.innerHTML = `${isTotalProfit ? '+' : ''}${formatCurrency(totalProfitLoss)}`;
-    }
+    elements.totalProfit.className = `kpi-value ${isTotalProfit ? 'profit-up' : 'profit-down'}`;
+    elements.totalProfit.innerHTML = `${isTotalProfit ? '+' : ''}${formatCurrency(totalProfitLoss)}`;
 
-    if (elements.profitRatio) {
-        elements.profitRatio.className = `kpi-change ${isTotalProfit ? 'up' : 'down'}`;
-        elements.profitRatio.innerText = `${isTotalProfit ? '+' : ''}${totalRatio.toFixed(2)}% 總報酬率`;
-    }
+    elements.profitRatio.className = `kpi-change ${isTotalProfit ? 'up' : 'down'}`;
+    elements.profitRatio.innerText = `${isTotalProfit ? '+' : ''}${totalRatio.toFixed(2)}% 總報酬率`;
 
     updateCharts(filteredPortfolio);
-    updateETFDropdown();
+    updateETFDropdown(); // 同步更新 ETF 下拉選單
+    updateDividendHistoryDropdown(); // 更新歷年配息下拉選單
+
+    // 渲染市場指數
+    renderMarketIndices();
 }
 
 function renderMarketIndices() {
@@ -548,9 +547,7 @@ if (dividendHistorySelect) {
 }
 
 // 事件監聽
-if (elements.groupSelect) {
-    elements.groupSelect.addEventListener('change', updateDashboard);
-}
+elements.groupSelect.addEventListener('change', updateDashboard);
 
 // 頁面切換邏輯 (輔助自訂功能跳轉)
 window.showSettingsPage = function () {
@@ -1487,6 +1484,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
         let targetId = '';
         if (text === '資產概況') targetId = 'page-dashboard';
         else if (text === '股息試算器') targetId = 'page-dividend';
+        else if (text === '熱門成分股') targetId = 'page-etf';
         else if (text === '設定') targetId = 'page-settings';
 
         if (targetId) {
@@ -1499,20 +1497,45 @@ document.querySelectorAll('.nav-item').forEach(item => {
                 const headerTitle = document.querySelector('header h1');
                 const headerSubtitle = document.querySelector('header .subtitle');
 
+                // 如果是切回儀表板，需要強制觸發 ECharts 重新計算尺寸，否則在 display:none 後會破版
                 if (targetId === 'page-dashboard') {
                     if (pieChartInstance) pieChartInstance.resize();
                     if (pieTagChartInstance) pieTagChartInstance.resize();
                     if (heatmapInstance) heatmapInstance.resize();
+
                     if (headerTitle) headerTitle.innerText = "資產概況";
+                    if (headerSubtitle) headerSubtitle.innerText = "即時掌握您的投資績效與資產變化";
+
+                    const groupSel = document.querySelector('.group-select-wrapper');
+                    if (groupSel) groupSel.style.display = 'block';
+
                 } else if (targetId === 'page-dividend') {
                     if (headerTitle) headerTitle.innerText = "股息試算器";
+                    if (headerSubtitle) headerSubtitle.innerText = "年度配息估算與歷史除權息紀錄";
+
+                    const groupSel = document.querySelector('.group-select-wrapper');
+                    if (groupSel) groupSel.style.display = 'none';
+
+                } else if (targetId === 'page-etf') {
+                    if (headerTitle) headerTitle.innerText = "熱門成份股";
+                    if (headerSubtitle) headerSubtitle.innerText = "掌握市場主流 ETF 內部關鍵個股";
+
+                    const groupSel = document.querySelector('.group-select-wrapper');
+                    if (groupSel) groupSel.style.display = 'none';
+
                 } else if (targetId === 'page-settings') {
                     if (headerTitle) headerTitle.innerText = "系統設定";
+                    if (headerSubtitle) headerSubtitle.innerText = "資料備份、匯出與隱私資料轉移";
+
+                    const groupSel = document.querySelector('.group-select-wrapper');
+                    if (groupSel) groupSel.style.display = 'none';
                 }
             }
         }
     });
 });
+
+// （移除舊版 Market Drawer 開關事件，按鈕改做橫滑預覽操作）
 
 // ==========================================
 // 初始化執行 (確保順序正確)
@@ -2092,23 +2115,6 @@ setTimeout(() => {
         if (tagDropdown) tagDropdown.style.display = 'none';
     });
 }, 500);
-
-// ==========================================
-// 初始化執行 (確保順序正確)
-// ==========================================
-populateStrategySelects();
-renderStrategySettings();
-renderTagSettings();
-updateTagSuggestions();
-
-// 立即渲染主儀表板，讓使用者看到資料
-updateDashboard();
-
-// 延遲背景同步即時價格
-setTimeout(() => {
-    syncLiveMarketData();
-}, 1000);
-
 
 
 
