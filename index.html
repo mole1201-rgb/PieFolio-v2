@@ -16,32 +16,47 @@
 
 <body>
     <div class="app-container">
-        <!-- 側邊選單 -->
-        <aside class="sidebar">
-                <div class="logo">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="12" y1="1" x2="12" y2="23"></line>
-                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                    </svg>
-                    存股小幫手
-                </div>
-                <!-- 新增：隱私與本地資料標記 -->
-                <div style="margin-top: -24px; margin-bottom: 24px; padding: 6px 10px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2); display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px #10b981;"></div>
-                    <span style="font-size: 0.75rem; color: #34d399; font-weight: 500;">🔒 本地資料加密儲存</span>
-                </div>
+        <!-- 頂部手機標題列 (僅在行動端顯示) -->
+        <div class="mobile-header">
+            <div class="logo">存股小幫手</div>
+            <div class="privacy-badge-mini">🔒 本地加密</div>
+        </div>
+
+        <!-- 側邊選單 (桌機版保留) / 底部導航 (行動版) -->
+        <nav class="main-nav">
+            <div class="sidebar-logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                <span>存股小幫手</span>
+            </div>
 
             <div class="nav-menu">
-                <div class="nav-item active">資產概況</div>
-                <div class="nav-item">股息試算器</div>
-                <div class="nav-item">設定</div>
+                <div class="nav-item active" data-page="page-dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-text">資產概況</span>
+                </div>
+                <div class="nav-item" data-page="page-dividend">
+                    <span class="nav-icon">💰</span>
+                    <span class="nav-text">股息試算</span>
+                </div>
+                <div class="nav-item" data-page="page-settings">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-text">設定</span>
+                </div>
             </div>
-        </aside>
+
+            <!-- 桌機版側邊欄底部的隱私標記 -->
+            <div class="sidebar-footer">
+                <div class="privacy-badge">🔒 本地資料加密儲存</div>
+            </div>
+        </nav>
 
         <!-- 主內容區塊 -->
         <main class="main-content" id="mainArea">
-            <header>
+            <header class="desktop-header">
                 <div>
                     <h1>資產概況</h1>
                     <p class="subtitle">即時掌握您的投資績效與資產變化</p>
@@ -140,22 +155,29 @@
                         <button class="btn-primary" id="addAssetBtn">+ 新增標的</button>
                     </div>
 
-                    <table class="assets-table">
-                        <thead>
-                            <tr>
-                                <th>標的名稱</th>
-                                <th>持有股數</th>
-                                <th>成交均價</th>
-                                <th>現價</th>
-                                <th>總市值</th>
-                                <th>未實現損益</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="assetTableBody">
-                            <!-- 資料將會透過 app.js 注入 -->
-                        </tbody>
-                    </table>
+                    <div class="asset-list-container">
+                        <table class="assets-table desktop-only">
+                            <thead>
+                                <tr>
+                                    <th>標的名稱</th>
+                                    <th>持有股數</th>
+                                    <th>成交均價</th>
+                                    <th>現價</th>
+                                    <th>總市值</th>
+                                    <th>未實現損益</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assetTableBody">
+                                <!-- 資料將會透過 app.js 注入 -->
+                            </tbody>
+                        </table>
+                        
+                        <!-- 手機版卡片容器 -->
+                        <div id="assetCardsContainer" class="mobile-only">
+                            <!-- 由 app.js 動態注入 -->
+                        </div>
+                    </div>
                 </div>
             </section>
 

@@ -62,6 +62,7 @@ function saveMarketIndices() {
 const elements = {
     groupSelect: document.getElementById('groupSelect'),
     assetTableBody: document.getElementById('assetTableBody'),
+    assetCardsContainer: document.getElementById('assetCardsContainer'), // 新增：手機版卡片容器
     totalValue: document.getElementById('totalValue'),
     totalProfit: document.getElementById('totalProfit'),
     totalValueChange: document.getElementById('totalValueChange'),
@@ -416,6 +417,7 @@ function formatCurrency(num) {
 
 function updateDashboard() {
     elements.assetTableBody.innerHTML = '';
+    if (elements.assetCardsContainer) elements.assetCardsContainer.innerHTML = '';
 
     let totalInvestment = 0;
     let totalMarketValue = 0;
@@ -441,7 +443,7 @@ function updateDashboard() {
         tr.innerHTML = `
             <td>
                 <span class="stock-name">${asset.name}</span>
-                <span class="stock-code">${asset.code} <span style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: var(--text-secondary); margin-left: 4px;">${asset.tag || '無標籤'}</span></span>
+                <span class="stock-code">${asset.code} <span class="card-tag">${asset.tag || '無標籤'}</span></span>
             </td>
             <td>${asset.shares.toLocaleString()} 股</td>
             <td>$${asset.avgCost.toFixed(2)}</td>
@@ -449,14 +451,54 @@ function updateDashboard() {
             <td>${formatCurrency(marketValue)}</td>
             <td class="${isProfit ? 'profit-up' : 'profit-down'}">
                 ${isProfit ? '+' : ''}${formatCurrency(profitLoss)}<br/>
-                <small>(${((profitLoss / investmentCost) * 100).toFixed(2)}%)</small>
+                <span style="font-size: 0.8rem;">(${isProfit ? '+' : ''}${((profitLoss / investmentCost) * 100).toFixed(2)}%)</span>
             </td>
             <td>
-                <button class="btn-edit" onclick="editAsset(${index})">編輯</button>
-                <button class="btn-delete" onclick="deleteAsset(${index})">刪除</button>
+                <button class="btn-edit" onclick="editAsset(${index})">編</button>
+                <button class="btn-delete" onclick="deleteAsset(${index})">刪</button>
             </td>
         `;
         elements.assetTableBody.appendChild(tr);
+
+        // --- 同步渲染手機版卡片 ---
+        const card = document.createElement('div');
+        card.className = 'asset-card';
+        card.innerHTML = `
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-name">${asset.name}</span>
+                    <span class="card-code">${asset.code} <span class="card-tag">${asset.tag || '無標籤'}</span></span>
+                </div>
+                <div class="${isProfit ? 'profit-up' : 'profit-down'}" style="text-align: right; font-weight: 600;">
+                    ${isProfit ? '+' : ''}${((profitLoss / investmentCost) * 100).toFixed(2)}%
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="card-item">
+                    <span class="card-label">持有股數</span>
+                    <span class="card-value">${asset.shares.toLocaleString()} 股</span>
+                </div>
+                <div class="card-item">
+                    <span class="card-label">成交均價</span>
+                    <span class="card-value">$${asset.avgCost.toFixed(2)}</span>
+                </div>
+                <div class="card-item">
+                    <span class="card-label">目前市值</span>
+                    <span class="card-value">${formatCurrency(marketValue)}</span>
+                </div>
+                <div class="card-item">
+                    <span class="card-label">累計損益</span>
+                    <span class="card-value ${isProfit ? 'profit-up' : 'profit-down'}">${isProfit ? '+' : ''}${formatCurrency(profitLoss)}</span>
+                </div>
+            </div>
+            <div class="card-actions">
+                <button class="btn-edit" onclick="editAsset(${index})" style="flex:1">編輯</button>
+                <button class="btn-delete" onclick="deleteAsset(${index})" style="flex:1">刪除</button>
+            </div>
+        `;
+        if (elements.assetCardsContainer) {
+            elements.assetCardsContainer.appendChild(card);
+        }
     });
 
     const totalProfitLoss = totalMarketValue - totalInvestment;
@@ -1470,68 +1512,48 @@ function renderDividendHistory() {
 }
 
 // ==========================================
-// 側邊選單導覽邏輯 (Sidebar Navigation / Tab Switching)
+// 選單導覽邏輯 (Responsive Navigation)
 // ==========================================
 document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', (e) => {
-        // 先移除所有選取狀態
+        const target = e.currentTarget;
+        const targetId = target.getAttribute('data-page');
+
+        if (!targetId) return;
+
+        // 1. 切換按鈕狀態
         document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-        // 為被點擊的項目加上選取狀態
-        e.target.classList.add('active');
+        target.classList.add('active');
 
-        // 根據點擊的文字，對應到目標分頁
-        const text = e.target.innerText.trim();
-        let targetId = '';
-        if (text === '資產概況') targetId = 'page-dashboard';
-        else if (text === '股息試算器') targetId = 'page-dividend';
-        else if (text === '熱門成分股') targetId = 'page-etf';
-        else if (text === '設定') targetId = 'page-settings';
+        // 2. 切換分頁
+        document.querySelectorAll('.page-section').forEach(page => page.classList.remove('active'));
+        const targetPage = document.getElementById(targetId);
+        if (targetPage) {
+            targetPage.classList.add('active');
 
-        if (targetId) {
-            // 切換分頁顯示狀態 (移除全部的 active)
-            document.querySelectorAll('.page-section').forEach(page => page.classList.remove('active'));
-            const targetPage = document.getElementById(targetId);
-            if (targetPage) {
-                targetPage.classList.add('active');
+            // 3. 更新標題 (桌機版)
+            const headerTitle = document.querySelector('.desktop-header h1');
+            const headerSubtitle = document.querySelector('.desktop-header .subtitle');
 
-                const headerTitle = document.querySelector('header h1');
-                const headerSubtitle = document.querySelector('header .subtitle');
-
-                // 如果是切回儀表板，需要強制觸發 ECharts 重新計算尺寸，否則在 display:none 後會破版
-                if (targetId === 'page-dashboard') {
-                    if (pieChartInstance) pieChartInstance.resize();
-                    if (pieTagChartInstance) pieTagChartInstance.resize();
-                    if (heatmapInstance) heatmapInstance.resize();
-
-                    if (headerTitle) headerTitle.innerText = "資產概況";
-                    if (headerSubtitle) headerSubtitle.innerText = "即時掌握您的投資績效與資產變化";
-
-                    const groupSel = document.querySelector('.group-select-wrapper');
-                    if (groupSel) groupSel.style.display = 'block';
-
-                } else if (targetId === 'page-dividend') {
+            // 4. 分頁特定邏輯
+            if (targetId === 'page-dashboard') {
+                if (pieChartInstance) pieChartInstance.resize();
+                if (pieTagChartInstance) pieTagChartInstance.resize();
+                if (heatmapInstance) heatmapInstance.resize();
+                if (headerTitle) headerTitle.innerText = "資產概況";
+                document.querySelector('.group-select-wrapper').style.display = 'block';
+            } else {
+                document.querySelector('.group-select-wrapper').style.display = 'none';
+                if (targetId === 'page-dividend') {
                     if (headerTitle) headerTitle.innerText = "股息試算器";
-                    if (headerSubtitle) headerSubtitle.innerText = "年度配息估算與歷史除權息紀錄";
-
-                    const groupSel = document.querySelector('.group-select-wrapper');
-                    if (groupSel) groupSel.style.display = 'none';
-
-                } else if (targetId === 'page-etf') {
-                    if (headerTitle) headerTitle.innerText = "熱門成份股";
-                    if (headerSubtitle) headerSubtitle.innerText = "掌握市場主流 ETF 內部關鍵個股";
-
-                    const groupSel = document.querySelector('.group-select-wrapper');
-                    if (groupSel) groupSel.style.display = 'none';
-
                 } else if (targetId === 'page-settings') {
                     if (headerTitle) headerTitle.innerText = "系統設定";
-                    if (headerSubtitle) headerSubtitle.innerText = "資料備份、匯出與隱私資料轉移";
-
-                    const groupSel = document.querySelector('.group-select-wrapper');
-                    if (groupSel) groupSel.style.display = 'none';
                 }
             }
         }
+        
+        // 手機版自動滾回頂部
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 });
 
