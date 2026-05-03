@@ -127,11 +127,12 @@ body {
 /* 主內容區域佈局 */
 .main-content {
   flex: 1;
-  padding: 48px;
+  padding: 24px;
   overflow-y: auto;
   scroll-behavior: smooth;
-  max-width: 1400px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
+  width: 100%;
 }
 
 /* Glassmorphism 升級版 */
@@ -154,9 +155,12 @@ body {
 /* Main Dashboard */
 .main-content {
   flex: 1;
-  padding: 32px 48px;
+  padding: 24px;
   overflow-y: auto;
-  overflow-x: hidden;
+  scroll-behavior: smooth;
+  max-width: 100%;
+  margin: 0;
+  width: 100%;
 }
 
 /* 主內容區域排版 */
@@ -545,7 +549,15 @@ h1 {
   .nav-item.active { box-shadow: 0 2px 0 var(--accent-color); background: transparent; }
   .nav-item.active::after { display: none; }
 
-  .main-content { padding: 24px 16px; }
+  .main-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  max-width: 100%;
+  margin: 0;
+  width: 100%;
+}
   
   .kpi-container { grid-template-columns: 1fr; gap: 16px; }
   
@@ -642,15 +654,12 @@ input:focus, select:focus {
 
 .main-content {
   flex: 1;
-  padding: 40px;
+  padding: 24px;
   overflow-y: auto;
-  display: block !important; 
-  position: relative;
-  background: var(--bg-color);
-  
-  /* 隱藏捲軸但保留功能 */
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
+  scroll-behavior: smooth;
+  max-width: 100%;
+  margin: 0;
+  width: 100%;
 }
 
 .main-content::-webkit-scrollbar {
@@ -775,7 +784,15 @@ input:focus, select:focus {
   .nav-item.active::after { display: none; }
 
   /* 縮小兩側邊距 */
-  .main-content { padding: 24px 20px !important; }
+  .main-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  max-width: 100%;
+  margin: 0;
+  width: 100%;
+}
   
   /* 確保 KPI 與圓餅圖不換行或適度縮小 */
   .kpi-container { grid-template-columns: repeat(2, 1fr) !important; gap: 16px; }
@@ -802,7 +819,15 @@ input:focus, select:focus {
   .nav-item.active::after { display: none; }
 
   /* 極小化邊距 */
-  .main-content { padding: 16px 12px !important; }
+  .main-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  max-width: 100%;
+  margin: 0;
+  width: 100%;
+}
   
   /* 改為單欄垂直排列 */
   .kpi-container { 
@@ -844,4 +869,162 @@ input:focus, select:focus {
   /* 其他區塊縮小 Padding */
   .glass-panel { padding: 16px !important; }
   header { margin-bottom: 24px !important; flex-direction: column; align-items: flex-start; gap: 12px; }
+}
+
+/* ==========================================
+   ?典?皛曉?璇??(?梯?雿??皛曉?)
+   ========================================== */
+* {
+    scrollbar-width: none !important; /* Firefox */
+    -ms-overflow-style: none !important; /* IE and Edge */
+}
+*::-webkit-scrollbar {
+    display: none !important; /* Chrome, Safari, Opera */
+    width: 0px !important;
+    height: 0px !important;
+}
+
+/* ==========================================
+   瘨?餉???典?皛曉?璇?(霈??摨阡?批捆?芸???)
+   ========================================== */
+@media (min-width: 1024px) {
+    .glass-panel {
+        max-height: none !important;
+        overflow-y: visible !important;
+        height: auto !important;
+    }
+    .assets-table, .trend-table {
+        max-height: none !important;
+        overflow-y: visible !important;
+    }
+    #dividendHistoryList, #tagSettingsList {
+        max-height: none !important;
+        overflow-y: visible !important;
+    }
+}
+
+/* ==========================================
+   ????瑽?(撖砍漲 767px 隞乩?)
+   ========================================== */
+@media (max-width: 767px) {
+    /* ?撠汗?????嚗?摮葬撠蔭銝?*/
+    .topbar {
+        flex-direction: column !important;
+        align-items: center !important;
+        padding: 12px 16px !important;
+        gap: 12px !important;
+    }
+    .topbar > div:first-child {
+        flex-direction: column !important;
+        gap: 8px !important;
+        justify-content: center !important;
+    }
+    .topbar .logo {
+        font-size: 1.2rem !important;
+        justify-content: center !important;
+    }
+    .topbar .privacy-badge {
+        padding: 4px 8px !important;
+    }
+    .topbar .privacy-badge span {
+        font-size: 0.7rem !important;
+    }
+    
+    .nav-menu {
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        gap: 8px !important;
+    }
+    .nav-item {
+        padding: 6px 10px !important;
+        font-size: 0.8rem !important;
+    }
+
+    /* 蝮桀???蝛箇?? */
+    .main-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  max-width: 100%;
+  margin: 0;
+  width: 100%;
+}
+    header {
+        margin-bottom: 16px !important;
+        gap: 4px !important;
+    }
+    header h1 {
+        font-size: 1.6rem !important;
+        margin-bottom: 4px !important;
+    }
+    header .subtitle {
+        font-size: 0.85rem !important;
+    }
+
+    /* 蝮桀?憭折?憿摮?*/
+    .kpi-value {
+        font-size: 2rem !important;
+    }
+    #totalDividendOutput {
+        font-size: 2rem !important;
+    }
+
+    /* ?∠???隤踹?嚗??恍?港嗾瘛?*/
+    .glass-panel {
+        padding: 12px !important;
+        border-radius: 16px !important;
+        margin-bottom: 16px !important;
+    }
+
+    .kpi-card {
+        padding: 16px !important;
+        min-height: 100px !important;
+    }
+
+    /* 蝣箔?????祇?甈??憛??甈銝銝?*/
+    .kpi-container {
+        grid-template-columns: 1fr !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+        margin-bottom: 16px !important;
+    }
+
+    .glass-panel[style*="relative"] {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 16px !important;
+    }
+    
+    .section-title {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+    }
+    
+    .section-title button, .section-title select {
+        width: 100% !important;
+        text-align: center !important;
+        margin-top: 4px !important;
+    }
+    
+    /* 銵冽隤踵 */
+    .assets-table {
+        font-size: 13px !important;
+    }
+    .assets-table th, .assets-table td {
+        padding: 6px !important;
+    }
+}
+/* 撘瑕?梯??函???遝?? */
+html, body {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+html::-webkit-scrollbar, body::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
 }
