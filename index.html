@@ -138,6 +138,10 @@
                             左右滑動切換策略或產業分佈</span>
                     </div>
 
+                    <!-- 圓餅圖下方的預警摘要區域 -->
+                    <div id="portfolioWarningsArea" style="margin-top: 16px; display: none; flex-direction: column; gap: 8px;">
+                    </div>
+
                 <!-- 持股清單 (正確歸位於分頁內並垂直排列) -->
                 <div class="glass-panel" style="padding: 24px; margin-top: 24px; width: 100%;">
                     <div class="section-title">
@@ -210,6 +214,18 @@
                                 <!-- JS 動態生成 -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <div class="glass-panel" style="padding: 24px; margin-bottom: 24px;">
+                    <div class="section-title">
+                        <span>📈 歷年股息對比與趨勢</span>
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 16px;">
+                        基於您目前的持股比例，回推歷年可領取的總股息與成長率。
+                    </p>
+                    <div id="dividendTrendArea">
+                        <!-- 由 app.js 動態生成 -->
                     </div>
                 </div>
 

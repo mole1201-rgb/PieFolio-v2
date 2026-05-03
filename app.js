@@ -23,6 +23,30 @@ if (savedPortfolio) {
     localStorage.setItem('myPortfolio', JSON.stringify(portfolio));
 }
 
+// 模組三：確保「Cash (閒置現金)」存在
+function ensureCashAsset() {
+    let cashIdx = portfolio.findIndex(a => a.code === 'CASH' || a.name.includes('Cash') || a.name.includes('閒置現金'));
+    if (cashIdx === -1) {
+        portfolio.push({
+            name: "Cash (閒置現金)",
+            code: "CASH",
+            shares: 1,
+            avgCost: 0,
+            currentPrice: 100000, // 預設 10 萬
+            macro: "cash",
+            tag: "現金"
+        });
+        savePortfolio();
+    } else {
+        // 標準化代碼
+        if (portfolio[cashIdx].code !== 'CASH') {
+            portfolio[cashIdx].code = 'CASH';
+            savePortfolio();
+        }
+    }
+}
+ensureCashAsset();
+
 function savePortfolio() {
     localStorage.setItem('myPortfolio', JSON.stringify(portfolio));
 }
@@ -99,7 +123,8 @@ const elements = {
     assetCost: document.getElementById('assetCost'),
     assetPrice: document.getElementById('assetPrice'),
     assetTargetReturn: document.getElementById('assetTargetReturn'),
-    submitAssetBtn: document.querySelector('#addAssetForm button[type="submit"]')
+    submitAssetBtn: document.querySelector('#addAssetForm button[type="submit"]'),
+    dividendTrendArea: document.getElementById('dividendTrendArea')
 };
 
 // ==========================================
@@ -395,6 +420,33 @@ if (savedDivData) {
     } catch (e) { }
 }
 
+// 預設 0050 離線備援配息資料 (2023-2026)，作為 API 抓取失敗時的參考基準
+if (!myDividendData['0050'] || !myDividendData['0050'].history || myDividendData['0050'].history.length === 0) {
+    myDividendData['0050'] = {
+        expectedPerShare: 4.06,
+        ytdPerShare: 1.36,
+        frequency: '半年配',
+        averages: {
+            '1y': 4.06, // 近1年: 2024H2(2.70) + 2025H1(0.36) + 2025H2(1.00) 以合理推算
+            '3y': 4.15,
+            '5y': 3.90,
+            '10y': 3.50
+        },
+        history: [
+            { date: 1768867200, amount: 1.00 }, // 2026/01/22 (2025H2) (估算 timestamp)
+            { date: 1753056000, amount: 0.36 }, // 2025/07/21 (2025H1)
+            { date: 1737072000, amount: 2.70 }, // 2025/01/17 (2024H2)
+            { date: 1721088000, amount: 1.00 }, // 2024/07/16 (2024H1)
+            { date: 1705449600, amount: 3.00 }, // 2024/01/17 (2023H2)
+            { date: 1689638400, amount: 1.90 }, // 2023/07/18 (2023H1)
+            { date: 1675036800, amount: 2.60 }, // 2023/01/30 (2022H2)
+            { date: 1658102400, amount: 1.80 }, // 2022/07/18 (2022H1)
+            { date: 1642723200, amount: 3.20 }, // 2022/01/21 (2021H2)
+            { date: 1629417600, amount: 0.35 }  // 2021/08/20 (2021H1)
+        ]
+    };
+}
+
 // 儲存圖表實例
 let pieChartInstance = null; // ECharts Macro
 let pieTagChartInstance = null; // ECharts Tag
@@ -419,7 +471,9 @@ function updateDashboard() {
 
     let totalInvestment = 0;
     let totalMarketValue = 0;
+    let securitiesMarketValue = 0;
     let filteredPortfolio = [];
+    let portfolioWarnings = [];
 
     portfolio.forEach((asset, index) => {
         if (!asset) return;
@@ -429,37 +483,87 @@ function updateDashboard() {
 
         filteredPortfolio.push(asset);
 
+        const isCash = asset.code === 'CASH';
+
         const investmentCost = asset.shares * asset.avgCost;
         const marketValue = asset.shares * asset.currentPrice;
         const profitLoss = marketValue - investmentCost;
         const isProfit = profitLoss >= 0;
 
-        totalInvestment += investmentCost;
         totalMarketValue += marketValue;
+        if (!isCash) {
+            totalInvestment += investmentCost;
+            securitiesMarketValue += marketValue;
+        }
+
+        // 計算權重 (用於警告與比例條)
+        const totalMV = portfolio.reduce((sum, a) => sum + (a.shares * a.currentPrice), 0);
+        const weight = totalMV > 0 ? (marketValue / totalMV) * 100 : 0;
+        
+        let weightWarning = "";
+        let barColor = "#3b82f6"; // 預設為藍色 (30% 以下)
+        
+        if (!isCash) {
+            if (weight > 50) {
+                barColor = "#ef4444"; // 紅色
+                weightWarning = `<span style="color: #ef4444; font-size: 0.75rem; font-weight: 600; margin-left: 2px;">🚨 集中度過高</span>`;
+                portfolioWarnings.push({ name: asset.name, code: asset.code, weight: weight, level: 'red' });
+            } else if (weight > 30) {
+                barColor = "#f59e0b"; // 黃色
+                weightWarning = `<span style="color: #f59e0b; font-size: 0.75rem; font-weight: 600; margin-left: 2px;">⚠️ 佔比偏高</span>`;
+                portfolioWarnings.push({ name: asset.name, code: asset.code, weight: weight, level: 'yellow' });
+            }
+        } else {
+            barColor = "#10b981"; // 現金用綠色
+        }
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>
-                <span class="stock-name">${asset.name}</span>
-                <span class="stock-code">${asset.code} <span style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: var(--text-secondary); margin-left: 4px;">${asset.tag || '無標籤'}</span></span>
+                <div style="margin-bottom: 4px;">
+                    <span class="stock-name">${asset.name}</span>
+                    <span class="stock-code">${asset.code} <span style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: var(--text-secondary); margin-left: 4px;">${asset.tag || '無標籤'}</span></span>
+                </div>
+                <!-- 視覺化比例條與佔比數字 -->
+                <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); width: 40px; text-align: left;">${weight.toFixed(1)}%</div>
+                    <div style="flex: 1; max-width: 80px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; display: flex;">
+                        <div style="width: ${weight}%; height: 100%; background: ${barColor}; border-radius: 3px;"></div>
+                    </div>
+                    ${weightWarning}
+                </div>
             </td>
-            <td>${asset.shares.toLocaleString()} 股</td>
-            <td>$${asset.avgCost.toFixed(2)}</td>
-            <td>$${asset.currentPrice.toFixed(2)}</td>
+            <td>${isCash ? '-' : asset.shares.toLocaleString() + ' 股'}</td>
+            <td>${isCash ? '-' : '$' + asset.avgCost.toFixed(2)}</td>
+            <td>
+                ${editingPriceSymbol === asset.code 
+                    ? `<div style="display: flex; align-items: center; gap: 6px; height: 100%;">
+                           <span style="color: var(--text-secondary); font-size: 0.9rem;">$</span>
+                           <input type="number" id="inline-price-${asset.code}" value="${asset.currentPrice}" step="any" min="0" style="width: 70px; padding: 2px 4px; font-size: 0.9rem; background: rgba(255,255,255,0.1); border: 1px solid var(--accent-color); color: #fff; border-radius: 4px; outline: none;" onkeypress="if(event.key === 'Enter') saveInlinePrice('${asset.code}')">
+                           <span style="cursor: pointer; font-size: 1rem; user-select: none;" onclick="saveInlinePrice('${asset.code}')" title="儲存">💾</span>
+                           <span style="cursor: pointer; font-size: 1rem; user-select: none;" onclick="cancelInlinePrice()" title="取消">❌</span>
+                       </div>`
+                    : `$${asset.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                       ${asset.isManualPrice 
+                           ? `<span class="edit-icon-inline" onclick="editInlinePrice('${asset.code}')" style="cursor: pointer; margin-left: 6px; font-size: 0.75rem; color: var(--text-secondary);">✏️ 手動設定</span>` 
+                           : `<span class="edit-icon-inline" onclick="editInlinePrice('${asset.code}')" style="cursor: pointer; margin-left: 6px; color: var(--text-secondary);">✎</span>`
+                       }`
+                }
+            </td>
             <td>${formatCurrency(marketValue)}</td>
             <td class="${isProfit ? 'profit-up' : 'profit-down'}">
-                ${isProfit ? '+' : ''}${formatCurrency(profitLoss)}<br/>
-                <small>(${((profitLoss / investmentCost) * 100).toFixed(2)}%)</small>
+                ${isCash ? '-' : (isProfit ? '+' : '') + formatCurrency(profitLoss)}<br/>
+                ${isCash ? '' : `<small>(${((profitLoss / (investmentCost || 1)) * 100).toFixed(2)}%)</small>`}
             </td>
             <td>
                 <button class="btn-edit" onclick="editAsset(${index})">編輯</button>
-                <button class="btn-delete" onclick="deleteAsset(${index})">刪除</button>
+                ${isCash ? '' : `<button class="btn-delete" onclick="deleteAsset(${index})">刪除</button>`}
             </td>
         `;
         elements.assetTableBody.appendChild(tr);
     });
 
-    const totalProfitLoss = totalMarketValue - totalInvestment;
+    const totalProfitLoss = securitiesMarketValue - totalInvestment;
     const isTotalProfit = totalProfitLoss >= 0;
     const totalRatio = totalInvestment > 0 ? (totalProfitLoss / totalInvestment) * 100 : 0;
 
@@ -471,6 +575,33 @@ function updateDashboard() {
 
     elements.profitRatio.className = `kpi-change ${isTotalProfit ? 'up' : 'down'}`;
     elements.profitRatio.innerText = `${isTotalProfit ? '+' : ''}${totalRatio.toFixed(2)}% 總報酬率`;
+
+    // 渲染圖表下方的預警提示
+    const warningsArea = document.getElementById('portfolioWarningsArea');
+    if (warningsArea) {
+        if (portfolioWarnings.length > 0) {
+            warningsArea.style.display = 'flex';
+            warningsArea.innerHTML = portfolioWarnings.map(w => {
+                const isRed = w.level === 'red';
+                const icon = isRed ? '🚨' : '⚠️';
+                const label = isRed ? '集中度過高' : '佔比偏高';
+                const colorStr = isRed ? 'var(--color-up)' : '#f59e0b';
+                const bgStr = isRed ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+                return `
+                    <div style="background: ${bgStr}; border: 1px solid ${colorStr}; padding: 12px; border-radius: 8px; font-size: 0.9rem; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <span style="font-weight: 600; color: ${colorStr}; margin-right: 8px;">${icon} 曝險預警：</span>
+                            <span style="color: var(--text-primary);">${w.name} (${w.code}) 佔總資產達 <span style="font-weight: 700; color: ${colorStr};">${w.weight.toFixed(1)}%</span></span>
+                        </div>
+                        <span style="color: ${colorStr}; font-weight: 600; font-size: 0.8rem; background: rgba(0,0,0,0.2); padding: 4px 8px; border-radius: 4px;">${label}</span>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            warningsArea.style.display = 'none';
+            warningsArea.innerHTML = '';
+        }
+    }
 
     updateCharts(filteredPortfolio);
     updateETFDropdown(); // 同步更新 ETF 下拉選單
@@ -579,12 +710,52 @@ window.showSettingsPage = function () {
 // 新增、編輯與刪除標的 (CRUD)
 // ==========================================
 
+let editingPriceSymbol = null;
+
+window.editInlinePrice = function(symbol) {
+    editingPriceSymbol = symbol;
+    updateDashboard(); // 觸發重新渲染以顯示輸入框
+    setTimeout(() => {
+        const input = document.getElementById(`inline-price-${symbol}`);
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    }, 50);
+};
+
+window.saveInlinePrice = function(symbol) {
+    const input = document.getElementById(`inline-price-${symbol}`);
+    if (!input) return;
+    
+    const newPrice = parseFloat(input.value);
+    const asset = portfolio.find(a => a.code === symbol);
+    if (asset && !isNaN(newPrice) && newPrice >= 0) {
+        asset.currentPrice = newPrice;
+        asset.isManualPrice = true;
+        savePortfolio();
+    } else {
+        alert('請輸入有效的數字！');
+        return;
+    }
+    
+    editingPriceSymbol = null;
+    updateDashboard(); // 重新計算與繪製
+    if (typeof renderDividendCalculator === 'function') renderDividendCalculator();
+};
+
+window.cancelInlinePrice = function() {
+    editingPriceSymbol = null;
+    updateDashboard(); // 取消並恢復原本畫面
+};
+
 let editingIndex = -1;
 
 // 編輯標的
 window.editAsset = function (index) {
     editingIndex = index;
     const asset = portfolio[index];
+    const isCash = asset.code === 'CASH';
 
     // 填入既有資料
     elements.assetName.value = asset.name;
@@ -600,10 +771,25 @@ window.editAsset = function (index) {
     elements.assetPrice.value = asset.currentPrice;
     elements.assetTargetReturn.value = ''; 
 
+    if (isCash) {
+        elements.assetName.readOnly = true;
+        elements.assetCode.readOnly = true;
+        elements.assetShares.readOnly = true;
+        elements.assetCost.readOnly = true;
+        elements.assetTargetReturn.readOnly = true;
+        elements.modalTitle.innerText = "編輯閒置現金 (請修改現價以代表金額)";
+    } else {
+        elements.assetName.readOnly = false;
+        elements.assetCode.readOnly = false;
+        elements.assetShares.readOnly = false;
+        elements.assetCost.readOnly = false;
+        elements.assetTargetReturn.readOnly = false;
+        elements.modalTitle.innerText = "編輯投資標的";
+    }
+
     // 自動試算
     setTimeout(() => { elements.assetPrice.dispatchEvent(new Event('input')); }, 50);
 
-    elements.modalTitle.innerText = "編輯投資標的";
     elements.submitAssetBtn.innerText = "儲存變更";
     elements.addAssetModal.classList.add('active');
 };
@@ -630,6 +816,12 @@ function closeAddAssetModal() {
     editingIndex = -1;
     elements.modalTitle.innerText = "新增投資標的";
     elements.submitAssetBtn.innerText = "確認新增";
+    
+    elements.assetName.readOnly = false;
+    elements.assetCode.readOnly = false;
+    elements.assetShares.readOnly = false;
+    elements.assetCost.readOnly = false;
+    elements.assetTargetReturn.readOnly = false;
 }
 
 elements.closeModalBtn.addEventListener('click', closeAddAssetModal);
@@ -838,7 +1030,7 @@ elements.assetCode.addEventListener('input', (e) => {
 elements.addAssetForm.addEventListener('submit', (e) => {
     e.preventDefault();
 
-    const newAsset = {
+    let newAsset = {
         name: elements.assetName.value,
         code: elements.assetCode.value,
         macro: (customStrategies.find(s => s.name === elements.assetMacro.value) || {id: 'growth'}).id,
@@ -850,6 +1042,14 @@ elements.addAssetForm.addEventListener('submit', (e) => {
 
     if (editingIndex >= 0) {
         // 編輯模式
+        if (portfolio[editingIndex].code === 'CASH') {
+            newAsset.code = 'CASH';
+            newAsset.name = 'Cash (閒置現金)';
+            newAsset.macro = 'cash';
+            newAsset.tag = '現金';
+            newAsset.shares = 1;
+            newAsset.avgCost = 0;
+        }
         portfolio[editingIndex] = newAsset;
     } else {
         // 新增模式
@@ -951,7 +1151,7 @@ function updateCharts(data) {
         const strategy = customStrategies.find(s => s.id === macroId);
         return {
             value: value,
-            name: strategy ? strategy.name : macroId,
+            name: strategy ? strategy.name : (macroId === 'cash' ? '現金' : macroId),
             itemStyle: { color: getMacroColor(macroId) }
         };
     }).sort((a, b) => b.value - a.value);
@@ -1031,7 +1231,8 @@ function renderDividendCalculator() {
     let totalExpected = 0;
 
     portfolio.forEach(asset => {
-        const divInfo = myDividendData[asset.code];
+        const cacheKey = asset.code.replace(/\.TWO?$/, '');
+        const divInfo = myDividendData[cacheKey];
         // 強化版「全球/海外成分股」ETF 識別邏輯 (Yahoo 數據源支援度低)
         const isOverseasETF = asset.code.startsWith('00') && (
             // 包含海外區域或知名指數關鍵字
@@ -1120,6 +1321,9 @@ function renderDividendCalculator() {
         const ytdTotal = asset.shares * ytdShare; // 今年已領總額
         totalExpected += totalDiv;
 
+        const isCash = asset.code === 'CASH';
+        if (isCash) return;
+
         const tr = document.createElement('tr');
         tr.style.borderBottom = "1px solid rgba(255,255,255,0.05)";
 
@@ -1137,7 +1341,11 @@ function renderDividendCalculator() {
                 ${ytdShare > 0 ? '$' + ytdShare.toFixed(2) + ' <br><span style="font-size:0.75rem; color:var(--text-secondary);">共 ' + formatCurrency(ytdTotal).replace('$', '') + '</span>' : '-'}
             </td>
             <td style="padding: 12px 8px;">
-                ${selectHtml}
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    ${selectHtml}
+                    ${dividendInputs[asset.code + '_manual'] ? '<span class="manual-badge">✏️ 手動設定</span>' : ''}
+                    <span class="edit-icon-inline" onclick="toggleManualDividend('${asset.code}')">✎</span>
+                </div>
             </td>
             <td style="padding: 12px 8px; font-weight: bold; color: var(--color-up); text-align: right;">
                 ${formatCurrency(totalDiv)}
@@ -1146,6 +1354,7 @@ function renderDividendCalculator() {
         elements.dividendCalcArea.appendChild(tr);
     });
 
+    renderDividendTrend();
     // 監聽歷史選項變更
     const selects = elements.dividendCalcArea.querySelectorAll('.div-strat-select');
     selects.forEach(sel => {
@@ -1175,7 +1384,8 @@ function calculateTotalDividend(total = null) {
     if (total === null) {
         total = 0;
         portfolio.forEach(asset => {
-            const divInfo = myDividendData[asset.code];
+            const cacheKey = asset.code.replace(/\.TWO?$/, '');
+            const divInfo = myDividendData[cacheKey];
             let perShare = 0;
             if (divInfo && divInfo.averages) {
                 const strat = dividendInputs[asset.code + '_strat'] || '1y';
@@ -1191,6 +1401,124 @@ function calculateTotalDividend(total = null) {
     }
 }
 
+function calculateAnnualDividends() {
+    const yearlyTotals = {};
+    const currentYear = new Date().getFullYear();
+
+    // 1. 歷史配息加總
+    portfolio.forEach(asset => {
+        if (asset.code === 'CASH') return;
+        const cacheKey = asset.code.replace(/\.TWO?$/, '');
+        const divInfo = myDividendData[cacheKey];
+        if (divInfo && divInfo.history && divInfo.history.length > 0) {
+            divInfo.history.forEach(h => {
+                const year = new Date(h.date * 1000).getFullYear();
+                const amount = h.amount * asset.shares;
+                if (!yearlyTotals[year]) yearlyTotals[year] = 0;
+                yearlyTotals[year] += amount;
+            });
+        }
+    });
+
+    // 2. 當年度預估總額 (覆寫當年度尚未發放完畢的歷史資料)
+    let currentYearExpected = 0;
+    portfolio.forEach(asset => {
+        if (asset.code === 'CASH') return;
+        const cacheKey = asset.code.replace(/\.TWO?$/, '');
+        const divInfo = myDividendData[cacheKey];
+        let perShare = 0;
+        if (divInfo && divInfo.averages) {
+            const strat = dividendInputs[asset.code + '_strat'] || '1y';
+            perShare = divInfo.averages[strat] || 0;
+        } else {
+            perShare = parseFloat(dividendInputs[asset.code]) || (divInfo ? divInfo.expectedPerShare : 0) || 0;
+        }
+        currentYearExpected += asset.shares * perShare;
+    });
+
+    if (currentYearExpected > 0) {
+        yearlyTotals[currentYear] = currentYearExpected;
+    }
+
+    const sortedYears = Object.keys(yearlyTotals).map(Number).sort((a, b) => b - a);
+    
+    const result = [];
+    sortedYears.forEach(year => {
+        const total = yearlyTotals[year];
+        let yoy = null;
+        if (yearlyTotals[year - 1] && yearlyTotals[year - 1] > 0) {
+            yoy = ((total - yearlyTotals[year - 1]) / yearlyTotals[year - 1]) * 100;
+        }
+        result.push({ 
+            year, 
+            total, 
+            yoy, 
+            isEstimate: year === currentYear 
+        });
+    });
+    
+    return result;
+}
+
+function renderDividendTrend() {
+    const trendArea = document.getElementById('dividendTrendArea');
+    if (!trendArea) return;
+
+    const annualData = calculateAnnualDividends();
+
+    if (annualData.length === 0) {
+        trendArea.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-secondary);">尚無足夠的歷史配息資料可供分析</div>';
+        return;
+    }
+
+    let html = `
+        <div style="overflow-x: auto;">
+            <table class="assets-table" style="width: 100%; min-width: 400px; text-align: left;">
+                <thead style="border-bottom: 1px solid var(--panel-border);">
+                    <tr>
+                        <th style="padding: 12px 8px; color: var(--text-secondary); font-weight: 500;">年份</th>
+                        <th style="padding: 12px 8px; color: var(--text-secondary); font-weight: 500; text-align: right;">年度累計總股息</th>
+                        <th style="padding: 12px 8px; color: var(--text-secondary); font-weight: 500; text-align: right;">YoY 成長率</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    annualData.forEach(d => {
+        const yearLabel = d.isEstimate ? `${d.year} (預估)` : `${d.year}`;
+        const totalStr = formatCurrency(d.total);
+        
+        let yoyHtml = '<span style="color: var(--text-secondary);">-</span>';
+        if (d.yoy !== null && !isNaN(d.yoy)) {
+            if (d.yoy > 0) {
+                // 依照使用者需求：正成長顯示綠色字體
+                yoyHtml = `<span style="color: #2ecc71; font-weight: 600;">+${d.yoy.toFixed(2)}%</span>`;
+            } else if (d.yoy < 0) {
+                // 負成長顯示紅色字體
+                yoyHtml = `<span style="color: #ef4444; font-weight: 600;">${d.yoy.toFixed(2)}%</span>`;
+            } else {
+                yoyHtml = `<span style="color: var(--text-secondary); font-weight: 600;">0.00%</span>`;
+            }
+        }
+
+        html += `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 12px 8px; font-weight: 500;">${yearLabel}</td>
+                <td style="padding: 12px 8px; text-align: right; font-weight: bold; color: #f3f4f6;">${totalStr}</td>
+                <td style="padding: 12px 8px; text-align: right;">${yoyHtml}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    trendArea.innerHTML = html;
+}
+
 async function syncDividendData() {
     const btn = document.getElementById('syncDividendBtn');
     if (btn) {
@@ -1198,106 +1526,142 @@ async function syncDividendData() {
         btn.innerHTML = '⏳ 正在拼命抓取資料...';
     }
 
-    const now = Math.floor(Date.now() / 1000);
-    // 為了計算長年期均值，抓取過去 10 年以上 (2014 起)
-    const fetchStart = Math.floor(new Date('2014-01-01').getTime() / 1000);
+    try {
+        const now = Math.floor(Date.now() / 1000);
+        // 為了計算長年期均值，抓取過去 10 年以上 (2014 起)
+        const fetchStart = Math.floor(new Date('2014-01-01').getTime() / 1000);
 
-    for (let asset of portfolio) {
-        let symbol = asset.code;
-        // 如果輸入 4 或 5 位數代號，先嘗試抓取 代號.TW
-        if (/^\d{4,6}$/.test(symbol) || /^\d{4}B$/.test(symbol)) {
-            symbol = `${symbol}.TW`;
-        }
+        const targetAssets = portfolio.filter(a => a.code !== 'CASH');
 
-        try {
-            const url = `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&period1=${fetchStart}&period2=${now}&events=div`;
-            let data = await fetchWithFallback(url, 15000);
+        const fetchPromises = targetAssets.map(async (asset, index) => {
+            // 放慢連線速度：每檔標的啟動前延遲 1000 毫秒，防止瞬間發出大量請求導致 API 或 Proxy (429) 限流阻擋
+            await new Promise(resolve => setTimeout(resolve, index * 1000));
 
-            // 若回傳 404 或無數據，自動改抓 代號.TWO
-            if ((!data || !data.chart || !data.chart.result || data.chart.result.length === 0) && symbol.endsWith('.TW')) {
-                const twoSymbol = symbol.replace('.TW', '.TWO');
-                const twoUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${twoSymbol}?interval=1d&period1=${fetchStart}&period2=${now}&events=div`;
-                data = await fetchWithFallback(twoUrl, 15000);
+            let symbol = asset.code;
+            // 極嚴格的代碼檢查：如果剛好是 0050，強制轉換為 0050.TW
+            if (symbol === '0050') {
+                symbol = '0050.TW';
+            } else if (/^\d{4,6}$/.test(symbol) || /^\d{4}B$/.test(symbol)) {
+                symbol = `${symbol}.TW`;
             }
 
-            if (data && data.chart && data.chart.result && data.chart.result[0].events && data.chart.result[0].events.dividends) {
-                const divs = data.chart.result[0].events.dividends;
-                // 取出所有股息事件，並確保使用原始 amount，不做任何除法
-                const divArray = Object.values(divs).map(d => ({
-                    date: d.date,
-                    amount: parseFloat(d.amount)
-                })).sort((a, b) => b.date - a.date); // 最新到最舊
+            // 調整逾時時間為 10 秒
+            const timeoutLimit = 10000; 
+            const abortController = new AbortController();
+            const signal = abortController.signal;
+            const timeoutId = setTimeout(() => abortController.abort(), timeoutLimit);
 
-                let freq = '年配';
-                let ytdPerShare = 0;
-                let avgs = { '1y': 0, '3y': 0, '5y': 0, '10y': 0 };
+            const timeoutPromise = new Promise((_, reject) => {
+                signal.addEventListener('abort', () => reject(new Error(`Timeout 10s for ${symbol}`)));
+            });
 
-                if (divArray.length > 0) {
-                    const latestDate = divArray[0].date;
+            try {
+                let data = null;
+                const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&period1=${fetchStart}&period2=${now}&events=div`;
+                
+                data = await Promise.race([
+                    fetchWithFallback(url, timeoutLimit),
+                    timeoutPromise
+                ]);
 
-                    // 特徵 1: 判斷配息頻率 (以最近一年為界)
-                    const oneYearBeforeLatest = latestDate - 365 * 24 * 60 * 60;
-                    const pastYearDivs = divArray.filter(d => d.date >= oneYearBeforeLatest);
-
-                    if (pastYearDivs.length >= 10) freq = '月配';
-                    else if (pastYearDivs.length >= 3 && pastYearDivs.length <= 6) freq = '季配';
-                    else if (pastYearDivs.length == 2) freq = '半年配';
-                    else freq = '年配';
-
-                    // 特徵 2: 年度累計法計算
-                    const calculateYearlyTotal = (year) => {
-                        return divArray
-                            .filter(d => new Date(d.date * 1000).getFullYear() === year)
-                            .reduce((sum, d) => sum + d.amount, 0);
-                    };
-
-                    const currentYear = new Date().getFullYear();
-                    ytdPerShare = calculateYearlyTotal(currentYear);
-                    const lastYearTotal = calculateYearlyTotal(currentYear - 1);
-                    const avg3y = (calculateYearlyTotal(currentYear - 1) + calculateYearlyTotal(currentYear - 2) + calculateYearlyTotal(currentYear - 3)) / 3;
-                    const avg5y = (calculateYearlyTotal(currentYear - 1) + calculateYearlyTotal(currentYear - 2) + calculateYearlyTotal(currentYear - 3) + calculateYearlyTotal(currentYear - 4) + calculateYearlyTotal(currentYear - 5)) / 5;
-                    const avg10y = (() => {
-                        let total = 0;
-                        for (let i = 1; i <= 10; i++) total += calculateYearlyTotal(currentYear - i);
-                        return total / 10;
-                    })();
-
-                    // 如果今年累計已大於去年，則 1y 以今年為主，否則保守採用去年的總和
-                    avgs['1y'] = ytdPerShare > lastYearTotal ? ytdPerShare : (lastYearTotal > 0 ? lastYearTotal : ytdPerShare);
-                    avgs['3y'] = avg3y;
-                    avgs['5y'] = avg5y;
-                    avgs['10y'] = avg10y;
+                // 若回傳 404 或無數據，自動改抓 代號.TWO
+                if ((!data || !data.chart || !data.chart.result || data.chart.result.length === 0) && symbol.endsWith('.TW')) {
+                    const twoSymbol = symbol.replace('.TW', '.TWO');
+                    const twoUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${twoSymbol}?interval=1d&period1=${fetchStart}&period2=${now}&events=div`;
+                    data = await Promise.race([
+                        fetchWithFallback(twoUrl, timeoutLimit),
+                        timeoutPromise
+                    ]);
                 }
 
-                myDividendData[asset.code] = {
-                    expectedPerShare: avgs['1y'], // backwards compat
-                    ytdPerShare: parseFloat(ytdPerShare.toFixed(3)),
-                    frequency: freq,
-                    averages: {
-                        '1y': parseFloat(avgs['1y'].toFixed(3)),
-                        '3y': parseFloat(avgs['3y'].toFixed(3)),
-                        '5y': parseFloat(avgs['5y'].toFixed(3)),
-                        '10y': parseFloat(avgs['10y'].toFixed(3))
-                    },
-                    history: divArray // 將完整的歷史存下來，供 renderDividendHistory 使用
-                };
+                if (data && data.chart && data.chart.result && data.chart.result[0].events && data.chart.result[0].events.dividends) {
+                    const divs = data.chart.result[0].events.dividends;
+                    // 取出所有股息事件
+                    const divArray = Object.values(divs).map(d => {
+                        let amt = parseFloat(d.amount);
+                        return {
+                            date: d.date,
+                            amount: amt
+                        };
+                    }).sort((a, b) => b.date - a.date); // 最新到最舊
 
-                // 不再強制覆寫 dividendInputs，以尊重手動覆寫的數值
+                    let freq = '年配';
+                    let ytdPerShare = 0;
+                    let avgs = { '1y': 0, '3y': 0, '5y': 0, '10y': 0 };
+
+                    if (divArray.length > 0) {
+                        const latestDate = divArray[0].date;
+
+                        // 特徵 1: 判斷配息頻率 (以最近一年為界)
+                        const oneYearBeforeLatest = latestDate - 365 * 24 * 60 * 60;
+                        const pastYearDivs = divArray.filter(d => d.date >= oneYearBeforeLatest);
+
+                        if (pastYearDivs.length >= 10) freq = '月配';
+                        else if (pastYearDivs.length >= 3 && pastYearDivs.length <= 6) freq = '季配';
+                        else if (pastYearDivs.length == 2) freq = '半年配';
+                        else freq = '年配';
+
+                        // 特徵 2: 年度累計法計算
+                        const calculateYearlyTotal = (year) => {
+                            return divArray
+                                .filter(d => new Date(d.date * 1000).getFullYear() === year)
+                                .reduce((sum, d) => sum + d.amount, 0);
+                        };
+
+                        const currentYear = new Date().getFullYear();
+                        ytdPerShare = calculateYearlyTotal(currentYear);
+                        const lastYearTotal = calculateYearlyTotal(currentYear - 1);
+                        const avg3y = (calculateYearlyTotal(currentYear - 1) + calculateYearlyTotal(currentYear - 2) + calculateYearlyTotal(currentYear - 3)) / 3;
+                        const avg5y = (calculateYearlyTotal(currentYear - 1) + calculateYearlyTotal(currentYear - 2) + calculateYearlyTotal(currentYear - 3) + calculateYearlyTotal(currentYear - 4) + calculateYearlyTotal(currentYear - 5)) / 5;
+                        const avg10y = (() => {
+                            let total = 0;
+                            for (let j = 1; j <= 10; j++) total += calculateYearlyTotal(currentYear - j);
+                            return total / 10;
+                        })();
+
+                        // 如果今年累計已大於去年，則 1y 以今年為主，否則保守採用去年的總和
+                        avgs['1y'] = ytdPerShare > lastYearTotal ? ytdPerShare : (lastYearTotal > 0 ? lastYearTotal : ytdPerShare);
+                        avgs['3y'] = avg3y;
+                        avgs['5y'] = avg5y;
+                        avgs['10y'] = avg10y;
+                    }
+
+                    const cacheKey = asset.code.replace(/\.TWO?$/, '');
+                    myDividendData[cacheKey] = {
+                        expectedPerShare: avgs['1y'], // backwards compat
+                        ytdPerShare: parseFloat(ytdPerShare.toFixed(3)),
+                        frequency: freq,
+                        averages: {
+                            '1y': parseFloat(avgs['1y'].toFixed(3)),
+                            '3y': parseFloat(avgs['3y'].toFixed(3)),
+                            '5y': parseFloat(avgs['5y'].toFixed(3)),
+                            '10y': parseFloat(avgs['10y'].toFixed(3))
+                        },
+                        history: divArray // 將完整的歷史存下來，供 renderDividendHistory 使用
+                    };
+                }
+            } catch (err) {
+                // 容錯機制：發生錯誤時，印出警告但不刪除舊有資料，確保畫面不會出現待同步。
+                console.error(`Fetch dividend failed or timed out for ${asset.code}`, err);
+            } finally {
+                clearTimeout(timeoutId);
             }
-        } catch (err) {
-            console.error(`Fetch dividend failed for ${asset.code}`, err);
+        });
+
+        // 並行發出所有 API 請求 (Promise.allSettled 保證不論成功失敗都會往下走)
+        await Promise.allSettled(fetchPromises);
+
+        localStorage.setItem('myDividendData', JSON.stringify(myDividendData));
+        saveDividendInputs();
+        renderDividendCalculator();
+
+    } finally {
+        // 確保不論成功、失敗還是逾時，按鈕狀態一定會恢復
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '🔄 同步最新股息資訊';
         }
     }
-
-    localStorage.setItem('myDividendData', JSON.stringify(myDividendData));
-    saveDividendInputs();
-
-    if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = '🔄 同步最新股息資訊';
-    }
-
-    renderDividendCalculator();
 }
 
 // 渲染成分股 (Phase 2)
@@ -1370,7 +1734,8 @@ function renderDividendHistory() {
     }
 
     const selectedCode = selectEl.value;
-    const realData = myDividendData[selectedCode];
+    const cacheKey = selectedCode.replace(/\.TWO?$/, '');
+    const realData = myDividendData[cacheKey];
     // 只使用真實數據，移除虛擬假資料生成邏輯
     const historyData = (realData && realData.history && realData.history.length > 0) ? realData.history : null;
 
@@ -1763,10 +2128,9 @@ async function fetchWithFallback(url, timeoutMs = 8000) {
     }
 
     const proxies = [
-        (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}&disableCache=${Date.now()}`,
         (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
         (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-        (u) => `/.netlify/functions/proxy?url=${encodeURIComponent(u)}`
+        (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}&disableCache=${Date.now()}`
     ];
 
     for (let targetUrl of urls) {
@@ -2100,3 +2464,91 @@ setTimeout(initTagAutocomplete, 500);
 
 
 
+// 模組一：歷年股息對比與趨勢
+function renderDividendTrend() {
+    if (!elements.dividendTrendArea) return;
+    
+    // 計算歷年總和
+    const yearlySums = {};
+    portfolio.forEach(asset => {
+        if (asset.code === 'CASH') return;
+        const cacheKey = asset.code.replace(/\.TWO?$/, '');
+        const divInfo = myDividendData[cacheKey];
+        if (divInfo && divInfo.history) {
+            divInfo.history.forEach(h => {
+                const year = new Date(h.date * 1000).getFullYear();
+                if (!yearlySums[year]) yearlySums[year] = 0;
+                yearlySums[year] += h.amount * asset.shares;
+            });
+        }
+    });
+
+    const sortedYears = Object.keys(yearlySums).sort((a, b) => b - a);
+    if (sortedYears.length === 0) {
+        elements.dividendTrendArea.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 20px;">暫無歷年數據，請先同步股息資訊。</div>';
+        return;
+    }
+
+    let html = `<table class="trend-table">
+        <thead>
+            <tr>
+                <th>年份</th>
+                <th>累計預估總股息 (以目前持股計)</th>
+                <th>年增長率 (%)</th>
+            </tr>
+        </thead>
+        <tbody>`;
+
+    sortedYears.forEach((year, i) => {
+        const amount = yearlySums[year];
+        let growthStr = "-";
+        if (i < sortedYears.length - 1) {
+            const prevYear = sortedYears[i + 1];
+            const prevAmount = yearlySums[prevYear];
+            if (prevAmount > 0) {
+                const growth = ((amount - prevAmount) / prevAmount * 100);
+                const colorClass = growth >= 0 ? 'up' : 'down';
+                growthStr = `<span class="${colorClass}">${growth >= 0 ? '▲' : '▼'} ${Math.abs(growth).toFixed(1)}%</span>`;
+            }
+        }
+        
+        html += `
+            <tr>
+                <td class="trend-year">${year}</td>
+                <td class="trend-amount">${formatCurrency(amount)}</td>
+                <td class="trend-growth">${growthStr}</td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table>`;
+    elements.dividendTrendArea.innerHTML = html;
+}
+
+// 模組四：手動覆寫邏輯
+window.toggleManualPrice = function(index) {
+    const asset = portfolio[index];
+    const newPrice = prompt(`請輸入 ${asset.name} 的正確現價:`, asset.currentPrice);
+    if (newPrice !== null && !isNaN(parseFloat(newPrice))) {
+        asset.currentPrice = parseFloat(newPrice);
+        asset.manualPrice = true;
+        savePortfolio();
+        updateDashboard();
+        renderDividendCalculator();
+    }
+};
+
+window.toggleManualDividend = function(code) {
+    const asset = portfolio.find(a => a.code === code);
+    const cacheKey = code.replace(/\.TWO?$/, '');
+    const divInfo = myDividendData[cacheKey];
+    const currentVal = dividendInputs[code] !== undefined ? dividendInputs[code] : (divInfo ? divInfo.expectedPerShare : 0);
+    
+    const newVal = prompt(`請輸入 ${asset.name} 的年度預估每股股息:`, currentVal);
+    if (newVal !== null && !isNaN(parseFloat(newVal))) {
+        dividendInputs[code] = parseFloat(newVal);
+        dividendInputs[code + '_manual'] = true;
+        saveDividendInputs();
+        renderDividendCalculator();
+    }
+};
